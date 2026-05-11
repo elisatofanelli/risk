@@ -1,0 +1,4 @@
+method,confidence_level,number_of_observations,number_of_exceptions,expected_exception_rate,actual_exception_rate,pass_fail_simple,interpretation,kupiec_p_value
+historical,0.95,69,7,0.050000000000000044,0.10144927536231885,False,Observed exception rate falls outside the simple diagnostic tolerance.,0.08319626906849353
+parametric,0.95,69,7,0.050000000000000044,0.10144927536231885,False,Observed exception rate falls outside the simple diagnostic tolerance.,0.08319626906849353
+monte_carlo,0.95,69,7,0.050000000000000044,0.10144927536231885,False,Observed exception rate falls outside the simple diagnostic tolerance.,0.08319626906849353

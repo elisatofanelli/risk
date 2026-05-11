@@ -1,0 +1,5 @@
+instrument_id,type,underlying,position,strike,maturity,option_type,implied_vol,risk_free_rate
+STK1,stock,AAPL,100,,,,
+STK2,stock,MSFT,-50,,,,
+OPT1,option,AAPL,20,200,2027-06-30,call,0.25,0.04
+OPT2,option,MSFT,-15,350,2027-06-30,put,0.30,0.04
