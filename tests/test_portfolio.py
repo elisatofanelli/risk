@@ -24,3 +24,14 @@ def test_input_validation_catches_missing_option_fields(tmp_path):
     with pytest.raises(ValueError, match="Missing required option field"):
         load_portfolio(str(csv))
 
+
+def test_input_validation_catches_invalid_instrument_type(tmp_path):
+    csv = tmp_path / "bad_type.csv"
+    # Insert a non-supported type "bond"
+    csv.write_text(
+        "instrument_id,type,underlying,position,strike,maturity,option_type,implied_vol,risk_free_rate\n"
+        "BND1,bond,AAPL,10,,,,,\n"
+    )
+
+    with pytest.raises(ValueError, match="Invalid instrument type"):
+        load_portfolio(str(csv))

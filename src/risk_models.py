@@ -24,6 +24,27 @@ def _loss_summary(losses: np.ndarray, confidence_level: float, current_value: fl
     }
 
 
+def _shock_portfolio_volatility(portfolio_df: pd.DataFrame, log_returns: dict[str, float]) -> pd.DataFrame:
+    """
+    Dynamically adjust option implied volatility based on underlying spot shocks.
+    Uses a standard leverage effect heuristic: volatility increases when spot drops.
+    Formula: new_vol = original_vol * exp(-0.5 * log_return)
+    """
+    shocked_df = portfolio_df.copy()
+    option_mask = shocked_df["type"] == "option"
+
+    for idx, row in shocked_df[option_mask].iterrows():
+        underlying = row["underlying"]
+        if underlying in log_returns:
+            r = log_returns[underlying]
+            original_vol = float(row["implied_vol"])
+            # Apply an inverse elasticity of 0.5 to model the leverage effect
+            shocked_vol = original_vol * np.exp(-0.5 * r)
+            shocked_df.at[idx, "implied_vol"] = shocked_vol
+
+    return shocked_df
+
+
 def historical_var_es(portfolio_df, price_history_df, valuation_date, confidence_level=0.95) -> dict:
     price_history = price_history_df.copy()
     log_returns = compute_log_returns(price_history).dropna(how="any")
@@ -35,17 +56,22 @@ def historical_var_es(portfolio_df, price_history_df, valuation_date, confidence
 
     losses = []
     for _, r in log_returns.iterrows():
+        r_dict = r.to_dict()
         scenario_prices = {
-            col: float(current_prices[col] * np.exp(r[col]))
+            col: float(current_prices[col] * np.exp(r_dict[col]))
             for col in price_history.columns
         }
-        scenario_value = value_portfolio(portfolio_df, scenario_prices, valuation_date)
-        losses.append(-(scenario_value - current_value))
+        
+        # Apply dynamic volatility shock to the options
+        scenario_portfolio = _shock_portfolio_volatility(portfolio_df, r_dict)
+        scenario_value = value_portfolio(scenario_portfolio, scenario_prices, valuation_date)
+        
+        losses.append(current_value - scenario_value)
 
-    losses_arr = np.asarray(losses, dtype=float)
-    result = _loss_summary(losses_arr, confidence_level, current_value)
-    result.update({"number_of_scenarios": int(len(losses_arr)), "method": "historical"})
-    return result
+    losses_array = np.array(losses)
+    summary = _loss_summary(losses_array, confidence_level, current_value)
+    summary["number_of_scenarios"] = len(losses_array)
+    return summary
 
 
 def monte_carlo_var_es(
@@ -57,34 +83,33 @@ def monte_carlo_var_es(
     n_sims=10000,
     random_seed=42,
 ) -> dict:
-    daily_mean = calibration_result["daily_mean_returns"].reindex(spot_prices.keys()).fillna(0.0)
-    daily_cov = calibration_result["daily_cov_matrix"].reindex(index=spot_prices.keys(), columns=spot_prices.keys()).fillna(0.0)
+    underlying_order = list(spot_prices.keys())
+    mean = calibration_result["daily_mean_returns"].reindex(underlying_order).fillna(0.0).values
+    cov = calibration_result["daily_cov_matrix"].reindex(index=underlying_order, columns=underlying_order).fillna(0.0).values
+
+    rng = np.random.default_rng(random_seed)
+    simulated_returns = rng.multivariate_normal(mean, cov, size=n_sims)
 
     current_value = value_portfolio(portfolio_df, spot_prices, valuation_date)
-    rng = np.random.default_rng(random_seed)
-    simulated_returns = rng.multivariate_normal(daily_mean.values, daily_cov.values, size=n_sims)
-
     losses = []
-    cols = list(spot_prices.keys())
-    for scenario in simulated_returns:
-        scenario_prices = {
-            col: float(spot_prices[col] * np.exp(scenario[i]))
-            for i, col in enumerate(cols)
-        }
-        scenario_value = value_portfolio(portfolio_df, scenario_prices, valuation_date)
-        losses.append(-(scenario_value - current_value))
 
-    losses_arr = np.asarray(losses, dtype=float)
-    result = _loss_summary(losses_arr, confidence_level, current_value)
-    result.update(
-        {
-            "number_of_scenarios": int(n_sims),
-            "n_sims": int(n_sims),
-            "random_seed": int(random_seed),
-            "method": "monte_carlo",
+    for i in range(n_sims):
+        r_dict = {u: float(simulated_returns[i, j]) for j, u in enumerate(underlying_order)}
+        scenario_prices = {
+            u: float(spot_prices[u] * np.exp(r_dict[u]))
+            for u in underlying_order
         }
-    )
-    return result
+        
+        # Apply dynamic volatility shock to the options
+        scenario_portfolio = _shock_portfolio_volatility(portfolio_df, r_dict)
+        scenario_value = value_portfolio(scenario_portfolio, scenario_prices, valuation_date)
+        
+        losses.append(current_value - scenario_value)
+
+    losses_array = np.array(losses)
+    summary = _loss_summary(losses_array, confidence_level, current_value)
+    summary["number_of_scenarios"] = n_sims
+    return summary
 
 
 def parametric_var(
@@ -122,12 +147,9 @@ def parametric_var(
 
     current_value = value_portfolio(portfolio_df, spot_prices, valuation_date)
     return {
-        "VaR": float(var),
-        "ES": float(es),
+        "VaR": var,
+        "ES": es,
         "confidence_level": confidence_level,
-        "current_value": float(current_value),
-        "portfolio_std": float(portfolio_std),
-        "method": "parametric_delta_normal",
-        "number_of_scenarios": None,
+        "current_value": current_value,
+        "number_of_scenarios": 0,
     }
-
