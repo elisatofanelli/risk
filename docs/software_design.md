@@ -37,6 +37,7 @@ The goal is to keep responsibilities separated so each module is testable and re
 
 - Implements Black-Scholes price and delta for European calls and puts
 - Handles expiry and edge-case validation
+- Designed to support theoretical boundary checks (put-call parity, monotonicity, delta bounds)
 
 ### `src/portfolio.py`
 
@@ -54,7 +55,7 @@ The goal is to keep responsibilities separated so each module is testable and re
 
 - Runs rolling one-day-ahead backtests
 - Summarizes exception behavior
-- Includes Kupiec unconditional coverage as a basic statistical diagnostic
+- Includes Kupiec unconditional coverage and exception clustering analysis as statistical diagnostics
 
 ### `src/reporting.py`
 
@@ -102,7 +103,7 @@ reporting.py ----> CSV outputs in outputs/
 - `monte_carlo_var_es(...)` computes simulation-based risk
 - `parametric_var(...)` computes delta-normal VaR
 - `backtest_var(...)` produces rolling backtest data
-- `summarize_backtest(...)` summarizes exceptions and coverage
+- `summarize_backtest(...)` summarizes exceptions, coverage and clustering
 - `create_risk_report(...)` writes model outputs to CSV
 - `save_backtest_results(...)` writes backtest paths to CSV
 - `save_backtest_summary(...)` writes summary tables to CSV

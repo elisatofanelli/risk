@@ -11,7 +11,7 @@ if __package__ in {None, ""}:
 
 try:  # pragma: no cover - supports both module and script execution
     from .backtesting import backtest_var, summarize_backtest
-    from .calibration import calibrate_from_history
+    from .calibration import calibrate_from_history, load_user_params
     from .input_loader import load_portfolio
     from .market_data import load_price_history
     from .portfolio import portfolio_delta_exposures, value_portfolio
@@ -19,7 +19,7 @@ try:  # pragma: no cover - supports both module and script execution
     from .risk_models import historical_var_es, monte_carlo_var_es, parametric_var
 except ImportError:  # pragma: no cover - script fallback
     from src.backtesting import backtest_var, summarize_backtest
-    from src.calibration import calibrate_from_history
+    from src.calibration import calibrate_from_history, load_user_params
     from src.input_loader import load_portfolio
     from src.market_data import load_price_history
     from src.portfolio import portfolio_delta_exposures, value_portfolio
@@ -43,6 +43,7 @@ def main() -> None:
     hist_result = historical_var_es(portfolio_df, price_history_df, valuation_date)
     mc_result = monte_carlo_var_es(portfolio_df, spot_prices, calibration_result, valuation_date)
     param_result = parametric_var(portfolio_df, spot_prices, calibration_result, valuation_date)
+    
     report_path = project_root / "outputs" / "risk_report.csv"
     create_risk_report(
         {
@@ -52,6 +53,29 @@ def main() -> None:
         },
         str(report_path),
     )
+
+    user_mean_path = project_root / "data" / "user_params_mean.csv"
+    user_cov_path  = project_root / "data" / "user_params_cov.csv"
+
+    if user_mean_path.exists() and user_cov_path.exists():
+        user_params = load_user_params(str(user_mean_path), str(user_cov_path))
+
+        mc_user   = monte_carlo_var_es(
+            portfolio_df, spot_prices, user_params, valuation_date
+        )
+        param_user = parametric_var(
+            portfolio_df, spot_prices, user_params, valuation_date
+        )
+
+        print("\n--- Results using user-supplied parameters ---")
+        print(f"Monte Carlo VaR: {mc_user['VaR']:.2f},  ES: {mc_user['ES']:.2f}")
+        print(f"Parametric  VaR: {param_user['VaR']:.2f}, ES: {param_user['ES']:.2f}")
+
+        create_risk_report(
+            {"mc_user_params": mc_user, "param_user_params": param_user},
+            str(project_root / "outputs" / "risk_report_user_params.csv"),
+        )
+
 
     bt_hist = backtest_var(portfolio_df, price_history_df, "historical")
     bt_param = backtest_var(portfolio_df, price_history_df, "parametric")
@@ -70,7 +94,7 @@ def main() -> None:
         str(project_root / "outputs" / "backtest_summary.csv"),
     )
 
-    print(f"Portfolio value: {portfolio_value:.2f}")
+    print(f"\nPortfolio value: {portfolio_value:.2f}")
     print("Delta exposures:")
     for underlying, delta in deltas.items():
         print(f"  {underlying}: {delta:.4f}")
@@ -78,7 +102,7 @@ def main() -> None:
     print(f"Monte Carlo VaR: {mc_result['VaR']:.2f}, ES: {mc_result['ES']:.2f}")
     print(f"Parametric VaR: {param_result['VaR']:.2f}")
     print(f"Risk report saved to: {report_path}")
-    print("Backtest summary:")
+    print("\nBacktest summary:")
     print(summary_df.to_string(index=False))
 
 

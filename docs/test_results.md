@@ -6,7 +6,7 @@ This document should be updated after each formal test run. The current entries 
 
 - Test command: `pytest -q`
 - Status: passing
-- Last observed result: `10 passed`
+- Last observed result: `11 passed`
 - Notes: the suite currently emits pandas deprecation warnings from the environment, but no test failures were observed.
 
 ## Results Table
@@ -14,6 +14,7 @@ This document should be updated after each formal test run. The current entries 
 | Test Name | Expected Result | Actual Result | Pass/Fail | Interpretation | Bugs Found and Fixed |
 | --- | --- | --- | --- | --- | --- |
 | Black-Scholes put-call parity | Approximate parity holds within tolerance | Passed | Pass | Pricing formula is consistent. | None |
+| Option delta boundaries & monotonicity | Call delta in [0,1], Put delta in [-1,0]; price strictly monotonic vs spot/vol | Passed | Pass |
 | Input validation | Invalid inputs raise `ValueError` | Passed | Pass | Input checks reject malformed portfolio files. | None |
 | Portfolio valuation | Returns numeric portfolio value | Passed | Pass | Portfolio aggregation works. | None |
 | Covariance matrix dimensions | Matrix shape matches number of assets | Passed | Pass | Calibration output is dimensionally consistent. | None |
@@ -21,6 +22,7 @@ This document should be updated after each formal test run. The current entries 
 | Historical scenario repricing | Repricing uses historical log-return shocks | Passed | Pass | Historical VaR uses full revaluation under historical scenarios. | None |
 | Monte Carlo reproducibility | Same seed yields same result | Passed | Pass | Random seed is fixed for deterministic simulation output. | None |
 | Backtesting exception count | Exception count is reported correctly | Passed | Pass | Backtesting summary reports exception counts and rates. | None |
+| Exception clustering analysis | Function identifies consecutive daily exceptions | Passed | Pass |
 | No lookahead bias | Backtest only uses data up to calibration date | Passed | Pass | Rolling calibration window uses only past data. | None |
 
 ### Automated Test Suite Result

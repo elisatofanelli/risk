@@ -20,6 +20,8 @@ This test plan covers:
 
 - Black-Scholes call and put prices are positive.
 - Put-call parity holds approximately.
+- Option delta is bounded correctly ([0, 1] for calls, [-1, 0] for puts).
+- Option prices maintain strict monotonicity with respect to spot price and volatility.
 - Input validation rejects missing option fields.
 - Input validation rejects invalid instrument types and non-positive prices.
 - Portfolio valuation returns a numeric result.
@@ -45,6 +47,7 @@ This test plan covers:
 - Summary output is created and persisted.
 - No lookahead bias is introduced beyond the calibration window.
 - Backtest exception count is reported for each method.
+- The summary function correctly tests for consecutive daily exceptions (clustering analysis).
 
 ## Input Validation Tests
 
