@@ -96,24 +96,38 @@ def parametric_var(
 ) -> dict:
     exposures = portfolio_delta_exposures(portfolio_df, spot_prices, valuation_date)
     underlying_order = list(spot_prices.keys())
-    exposure_vector = np.array([exposures.get(u, 0.0) * float(spot_prices[u]) for u in underlying_order], dtype=float)
-    cov = calibration_result["daily_cov_matrix"].reindex(index=underlying_order, columns=underlying_order).fillna(0.0)
-    mean = calibration_result["daily_mean_returns"].reindex(underlying_order).fillna(0.0).values
+    exposure_vector = np.array(
+        [exposures.get(u, 0.0) * float(spot_prices[u]) for u in underlying_order],
+        dtype=float,
+    )
+    cov = (
+        calibration_result["daily_cov_matrix"]
+        .reindex(index=underlying_order, columns=underlying_order)
+        .fillna(0.0)
+    )
+    mean = (
+        calibration_result["daily_mean_returns"]
+        .reindex(underlying_order)
+        .fillna(0.0)
+        .values
+    )
 
     portfolio_mean = float(exposure_vector @ mean)
-    portfolio_var = float(exposure_vector @ cov.values @ exposure_vector)
-    portfolio_std = sqrt(max(portfolio_var, 0.0))
+    portfolio_var_scalar = float(exposure_vector @ cov.values @ exposure_vector)
+    portfolio_std = sqrt(max(portfolio_var_scalar, 0.0))
     z_score = float(norm.ppf(confidence_level))
     var = max(z_score * portfolio_std - portfolio_mean, 0.0)
+    es = float(-portfolio_mean + portfolio_std * norm.pdf(z_score) / (1.0 - confidence_level))
+    es = max(es, 0.0)
 
     current_value = value_portfolio(portfolio_df, spot_prices, valuation_date)
     return {
         "VaR": float(var),
+        "ES": float(es),
         "confidence_level": confidence_level,
         "current_value": float(current_value),
         "portfolio_std": float(portfolio_std),
         "method": "parametric_delta_normal",
         "number_of_scenarios": None,
-        "ES": None,
     }
 

@@ -107,7 +107,7 @@ def backtest_var(
 
 
 def summarize_backtest(backtest_df: pd.DataFrame) -> dict:
-    """Summarize backtest exceptions with a simple diagnostic and optional Kupiec test."""
+    """Summarize backtest exceptions with diagnostic and clustering check."""
 
     if backtest_df.empty:
         raise ValueError("Backtest DataFrame is empty.")
@@ -118,22 +118,34 @@ def summarize_backtest(backtest_df: pd.DataFrame) -> dict:
     n_exc = int(backtest_df["exception"].sum())
     actual_rate = n_exc / n_obs if n_obs else 0.0
     expected_rate = 1.0 - confidence_level
-    pass_fail = 0.02 <= actual_rate <= 0.08 if abs(confidence_level - 0.95) < 1e-12 else abs(actual_rate - expected_rate) <= 0.03
+    pass_fail = (
+        0.02 <= actual_rate <= 0.08
+        if abs(confidence_level - 0.95) < 1e-12
+        else abs(actual_rate - expected_rate) <= 0.03
+    )
 
-    # Kupiec unconditional coverage test.
-    # TODO: Extend with Christoffersen independence test if the course requires a stronger diagnostic.
     p_value = None
     if 0 < actual_rate < 1 and 0 < expected_rate < 1:
         lr_uc = -2.0 * (
-            (n_exc * log(expected_rate) + (n_obs - n_exc) * log(1 - expected_rate))
-            - (n_exc * log(actual_rate) + (n_obs - n_exc) * log(1 - actual_rate))
+            (n_exc * log(expected_rate) + (n_obs - n_exc) * log(1.0 - expected_rate))
+            - (n_exc * log(actual_rate) + (n_obs - n_exc) * log(1.0 - actual_rate))
         )
         p_value = float(1 - chi2.cdf(lr_uc, df=1))
+
+    exc_flags = backtest_df["exception"].astype(int).values
+    consecutive_pairs = int(((exc_flags[:-1] == 1) & (exc_flags[1:] == 1)).sum())
+    clustering_concern = consecutive_pairs > 1
 
     interpretation = (
         "Observed exception rate is within the simple diagnostic tolerance."
         if pass_fail
         else "Observed exception rate falls outside the simple diagnostic tolerance."
+    )
+    clustering_note = (
+        f"{consecutive_pairs} consecutive exception pair(s) detected — "
+        + ("possible clustering, investigate further."
+           if clustering_concern
+           else "no material clustering observed.")
     )
 
     return {
@@ -146,5 +158,8 @@ def summarize_backtest(backtest_df: pd.DataFrame) -> dict:
         "pass_fail_simple": pass_fail,
         "interpretation": interpretation,
         "kupiec_p_value": p_value,
+        "consecutive_exception_pairs": consecutive_pairs,
+        "clustering_concern": clustering_concern,
+        "clustering_note": clustering_note,
     }
 
