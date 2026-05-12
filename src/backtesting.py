@@ -78,7 +78,7 @@ def backtest_var(
             method=method,
             confidence_level=confidence_level,
             n_sims=n_sims,
-            random_seed=random_seed,
+            random_seed=random_seed + i,
         )
         var = float(risk_result["VaR"])
 

@@ -77,9 +77,9 @@ def main() -> None:
         )
 
 
-    bt_hist = backtest_var(portfolio_df, price_history_df, "historical")
-    bt_param = backtest_var(portfolio_df, price_history_df, "parametric")
-    bt_mc = backtest_var(portfolio_df, price_history_df, "monte_carlo")
+    bt_hist = backtest_var(portfolio_df, price_history_df, "historical", calibration_window=250)
+    bt_param = backtest_var(portfolio_df, price_history_df, "parametric", calibration_window=250)
+    bt_mc = backtest_var(portfolio_df, price_history_df, "monte_carlo", calibration_window=250, n_sims=1000)
 
     save_backtest_results(bt_hist, str(project_root / "outputs" / "backtest_historical.csv"))
     save_backtest_results(bt_param, str(project_root / "outputs" / "backtest_parametric.csv"))

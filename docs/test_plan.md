@@ -44,15 +44,20 @@ This test plan covers:
 
 ## Model Validation Tests
 
-- Covariance matrix dimensions precisely match the number of assets in the underlying price history. [`tests/test_risk_models.py`]
-- Historical scenario repricing accurately uses current spot prices combined with historical log-return shocks. [`tests/test_risk_models.py`]
-- Monte Carlo simulation paths are fully reproducible across multiple runs by utilizing a fixed random seed. [`tests/test_risk_models.py`]
-- VaR and Expected Shortfall outputs strictly produce non-negative loss values. [`tests/test_risk_models.py`]
+- **Covariance Dimensions:** Covariance matrix dimensions precisely match the number of assets in the underlying price history. [`tests/test_risk_models.py`]
+- **Historical Scenario Repricing:** Accurately uses current spot prices combined with historical log-return shocks. [`tests/test_risk_models.py`]
+- **Monte Carlo Reproducibility:** Simulation paths are fully reproducible across multiple runs by utilizing a fixed random seed. [`tests/test_risk_models.py`]
+- **Loss Positivity:** VaR and Expected Shortfall outputs strictly produce non-negative loss values. [`tests/test_risk_models.py`]
+- **P&L Attribution:** Confirms that the aggregate portfolio P&L equals the exact sum of individual stock and option P&L components under a price shock, ensuring no leakages in aggregation. [`tests/test_portfolio.py`]
+- **Gamma Convexity Benefit:** Verifies that full Black-Scholes repricing correctly captures positive gamma for long options during severe market shocks, resulting in smaller actual losses than a linear delta approximation would predict. [`tests/test_pricing.py`]
+- **Vega Effect (Volatility Buffering):** Confirms that the dynamic leverage effect (rising volatility during market drops) correctly increases the value of long option positions, acting as a buffer that reduces overall portfolio VaR compared to an unadjusted model. [`tests/test_risk_models.py`]
 
 ## Robustness Tests
 
 - **Extreme Scenarios:** Evaluate model behavior when subjected to exceptionally large historical outliers (e.g., extreme single-day market crashes) to ensure the system does not fail on NaN standard deviations. [`tests/test_risk_models.py`]
 - **Covariance Stability:** Confirm the calibration engine gracefully handles short historical windows without crashing when generating matrices. [`tests/test_risk_models.py`]
+- **Monte Carlo Convergence:** Verify that Monte Carlo VaR estimates approach the analytical Parametric VaR as `n_sims` increases from 200 to 10,000, confirming the mathematical consistency of the simulation engine. [`tests/test_risk_models.py`]
+- **Calibration Window Sensitivity:** Evaluates how the VaR estimate responds to different historical calibration window sizes (e.g., 250 days vs 60 days), ensuring the model dynamically adapts to recent market volatility rather than remaining static. [`tests/test_risk_models.py`]
 
 ## Backtesting Tests
 

@@ -54,9 +54,10 @@ The goal is to keep responsibilities separated so each module is highly cohesive
 
 ### `src/backtesting.py`
 - **Purpose:** Runs rolling one-day-ahead backtests to compare predicted VaR against actual realized losses. Evaluates model performance via simple tolerance checks, exception clustering, and unconditional coverage tests.
-- **Assumptions:** Assumes a rolling calibration window is valid. Assumes the portfolio positions remain entirely static over the 1-day holding period (no intraday trading).
+- **Assumptions:** Assumes a rolling calibration window is valid. Assumes the portfolio positions remain entirely static over the 1-day holding period (no intraday trading). Assumes a 1-day holding period holding portfolio composition constant. For the Monte Carlo backtest, the system assumes a fixed random seed across all rolling windows; while this ensures reproducibility, it limits the observation of simulation variance across time.
 - **Interfaces:** Exports `backtest_var(...)` and `summarize_backtest(...)`.
 - **Data Structures:** `backtest_var` returns a pandas `DataFrame` where each row represents a backtest date with columns: `date, method, actual_loss, VaR, exception`. `summarize_backtest` returns a `dict` of aggregated test statistics.
+
 
 ### `src/reporting.py`
 - **Purpose:** Formats the computed risk and backtest results and writes them to standard CSV files for grading, auditing, and visualization.
@@ -87,6 +88,7 @@ calibration.py ----> calibration_result dict
         |
         v
 reporting.py ----> CSV outputs in outputs/
+````
 
 ## Error Handling
 
