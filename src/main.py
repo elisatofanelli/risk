@@ -119,17 +119,17 @@ def main() -> None:
     print(f"\n--- Equally-weighted models ---")
     print(f"Historical      VaR: {hist_result['VaR']:.2f},  ES: {hist_result['ES']:.2f}")
     print(f"Monte Carlo     VaR: {mc_result['VaR']:.2f},  ES: {mc_result['ES']:.2f}")
-    print(f"Parametric      VaR: {param_result['VaR']:.2f},  ES: N/A")
+    print(f"Parametric      VaR: {param_result['VaR']:.2f},  ES: {param_user['ES']}")
 
     print(f"\n--- EWMA models (λ=0.94) ---")
     print(f"EWMA Historical VaR: {ewma_hist_result['VaR']:.2f},  ES: {ewma_hist_result['ES']:.2f}")
     print(f"EWMA Monte Carlo VaR: {ewma_mc_result['VaR']:.2f},  ES: {ewma_mc_result['ES']:.2f}")
-    print(f"EWMA Parametric VaR: {ewma_param_result['VaR']:.2f},  ES: N/A")
+    print(f"EWMA Parametric VaR: {ewma_param_result['VaR']:.2f},  ES: {param_user['ES']}")
 
     if mc_user and param_user:
         print(f"\n--- User-supplied parameter models ---")
         print(f"Monte Carlo (user) VaR: {mc_user['VaR']:.2f},  ES: {mc_user['ES']:.2f}")
-        print(f"Parametric  (user) VaR: {param_user['VaR']:.2f},  ES: N/A")
+        print(f"Parametric  (user) VaR: {param_user['VaR']:.2f},  ES: {param_user['ES']}")
         print(f"  (user params: {user_mean_path.name}, {user_cov_path.name})")
 
     print(f"\nRisk report saved to: {report_path}")

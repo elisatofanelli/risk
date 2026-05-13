@@ -8,10 +8,12 @@ import pandas as pd
 
 
 def format_currency(value: float) -> str:
+    """Format a numeric value as a USD currency string."""
     return f"${value:,.2f}"
 
 
 def create_risk_report(results: dict, output_path: str):
+    """Compile a dictionary of risk results into a DataFrame and save it as a CSV report."""
     rows = []
     for method, result in results.items():
         row = {
@@ -32,6 +34,7 @@ def create_risk_report(results: dict, output_path: str):
 
 
 def save_backtest_results(backtest_df: pd.DataFrame, output_path: str) -> pd.DataFrame:
+    """Save the detailed rolling backtest DataFrame to a CSV file."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     backtest_df.to_csv(output, index=False)
@@ -39,6 +42,7 @@ def save_backtest_results(backtest_df: pd.DataFrame, output_path: str) -> pd.Dat
 
 
 def save_backtest_summary(summary_list, output_path: str) -> pd.DataFrame:
+    """Convert a list of backtest summary dictionaries into a DataFrame and save to CSV."""
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
     df = pd.DataFrame(summary_list)

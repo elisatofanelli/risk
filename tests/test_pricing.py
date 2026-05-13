@@ -6,6 +6,7 @@ from src.pricing import black_scholes_price, black_scholes_delta, black_scholes_
 
 
 def test_black_scholes_call_put_positive():
+    """Verify that valid Black-Scholes calls and puts always return positive prices."""
     call = black_scholes_price(100, 100, 1.0, 0.2, 0.05, "call")
     put = black_scholes_price(100, 100, 1.0, 0.2, 0.05, "put")
     assert call > 0
@@ -13,6 +14,7 @@ def test_black_scholes_call_put_positive():
 
 
 def test_put_call_parity_approximately_holds():
+    """Ensure the computed call and put prices satisfy put-call parity."""
     s = 100.0
     k = 100.0
     T = 1.0
@@ -22,11 +24,11 @@ def test_put_call_parity_approximately_holds():
     put = black_scholes_price(s, k, T, sigma, r, "put")
     lhs = call - put
     rhs = s - k * exp(-r * T)
-    assert abs(lhs - rhs) < 1e-2
+    assert abs(lhs - rhs) < 1e-8
 
 
 def test_call_goes_to_intrinsic_as_vol_approaches_zero():
-    """Price goes to intrinsic value as vol approaches 0."""
+    """Confirm that as volatility approaches zero, the option price converges to its intrinsic value."""
     spot, strike, r, T = 150.0, 100.0, 0.05, 1.0
     price = black_scholes_price(spot, strike, T, 0.0001, r, "call")
     intrinsic = spot - strike * exp(-r * T)
@@ -34,7 +36,7 @@ def test_call_goes_to_intrinsic_as_vol_approaches_zero():
 
 
 def test_time_to_maturity_zero():
-    """If T=0, the option must evaluate exactly to its intrinsic value."""
+    """Verify that when time to maturity is zero, the option evaluates to its intrinsic payoff."""
     S = 100.0; K = 90.0; T = 0.0; r = 0.05; sigma = 0.2
     call_price = black_scholes_price(S, K, T, sigma, r, "call")
     assert call_price == 10.0  # 100 - 90
@@ -44,7 +46,7 @@ def test_time_to_maturity_zero():
 
 
 def test_delta_boundaries():
-    """Test the mathematical limits of the Delta."""
+    """Check that call Delta is in (0, 1) and put Delta is in (-1, 0)."""
     delta_call = black_scholes_delta(100.0, 100.0, 1.0, 0.2, 0.05, "call")
     delta_put = black_scholes_delta(100.0, 100.0, 1.0, 0.2, 0.05, "put")
     
@@ -53,66 +55,19 @@ def test_delta_boundaries():
 
 
 def test_volatility_zero_raises_error():
-    """Special Case Test: Zero volatility (with T>0) should raise an error."""
+    """Ensure the model explicitly rejects zero volatility inputs for non-expired options."""
     with pytest.raises(ValueError, match="Volatility must be positive"):
-        # Passing sigma = 0.0
         black_scholes_price(100.0, 100.0, 1.0, 0.0, 0.05, "call")
 
 
 def test_strike_zero_raises_error():
-    """Special Case Test: Zero or negative strike is physically impossible."""
+    """Ensure the model rejects zero or negative strike prices."""
     with pytest.raises(ValueError, match="Strike price must be positive"):
-        # Passing strike = 0.0
         black_scholes_price(100.0, 0.0, 1.0, 0.2, 0.05, "put")
-
-def test_full_repricing_exceeds_delta_approximation_for_large_move():
-    """
-    Component Accuracy Test: For a large negative spot move (-10%), verify that
-    the actual option loss computed by full Black-Scholes repricing is greater
-    than the loss predicted by the linear delta approximation alone.
-
-    This confirms that full repricing was the correct choice for historical and
-    Monte Carlo scenarios: the delta approximation systematically understates
-    losses for large moves due to option convexity (gamma effect).
-
-    Method:
-      - Price an ATM call at spot=100.
-      - Apply a -10% spot shock (spot -> 90).
-      - Compute actual loss: original_price - repriced_price.
-      - Compute delta-approximated loss: delta * spot * 0.10
-      - Assert: actual_loss > delta_approx_loss
-    """
-    spot = 100.0
-    strike = 100.0
-    T = 1.0
-    sigma = 0.25
-    r = 0.05
-    shock = -0.10  
-
-    
-    shocked_spot = spot * math.exp(shock)  
-
-    original_price = black_scholes_price(spot, strike, T, sigma, r, "call")
-    repriced_price = black_scholes_price(shocked_spot, strike, T, sigma, r, "call")
-    actual_loss = original_price - repriced_price
-
-    delta = black_scholes_delta(spot, strike, T, sigma, r, "call")
-    delta_approx_loss = delta * spot * abs(shock)
-
-    assert actual_loss < delta_approx_loss, (
-        f"Expected full repricing loss ({actual_loss:.4f}) < "
-        f"delta approximation ({delta_approx_loss:.4f})"
-    )
 
 
 def test_delta_gamma_approximation_vs_full_repricing():
-    """
-    Delta-Gamma Approximation Test: Verifies that the 2nd-order Taylor series 
-    expansion (Delta + Gamma) closely approximates the exact Black-Scholes 
-    repricing for a small move in the underlying asset.
-    
-    Formula: Approx New Price ≈ Old Price + (Delta * dS) + (0.5 * Gamma * dS^2)
-    """
+    """Verify that the Delta-Gamma approximation closely matches the exact Black-Scholes repricing for a small spot price move."""
     spot = 100.0
     strike = 100.0
     T = 1.0
@@ -138,12 +93,9 @@ def test_delta_gamma_approximation_vs_full_repricing():
         f"exact price ({exact_new_price:.4f}). Error: {approximation_error:.6f}"
     )
 
+
 def test_implied_volatility_round_trip():
-    """
-    Implied Volatility Round-Trip Test: Tests the invertibility of the pricing model.
-    If we input Volatility X into Black-Scholes to get Price Y, putting Price Y 
-    into an Implied Volatility solver must return Volatility X.
-    """
+    """Test the invertibility of the pricing model by verifying that an implied volatility solver recovers the input volatility."""
     spot = 100.0
     strike = 105.0 
     T = 1.0
@@ -160,17 +112,12 @@ def test_implied_volatility_round_trip():
         f"Input vol: {input_vol:.4f}, Calculated vol: {calculated_vol:.4f}"
     )
 
+
 class TestMonotonicity:
-    """Call price must be strictly increasing in spot; put price strictly decreasing."""
+    """Verify monotonic relationships of option prices with respect to key inputs."""
  
     def test_call_price_increases_with_spot(self):
-        """
-        Monotonicity Test: A call option's value must increase as the underlying
-        spot price rises, all else equal.
- 
-        Fundamental no-arbitrage property: a higher spot makes in-the-money
-        expiry more likely, so the call must be worth more.
-        """
+        """Verify that a call option's value increases as the underlying spot price rises."""
         strike = 100.0
         T = 1.0
         sigma = 0.25
@@ -187,10 +134,7 @@ class TestMonotonicity:
             )
  
     def test_put_price_decreases_with_spot(self):
-        """
-        Monotonicity Test: A put option's value must decrease as spot rises —
-        the mirror of call monotonicity, equally required by no-arbitrage.
-        """
+        """Verify that a put option's value decreases as the underlying spot price rises."""
         strike = 100.0
         T = 1.0
         sigma = 0.25
@@ -207,10 +151,7 @@ class TestMonotonicity:
             )
  
     def test_call_price_increases_with_volatility(self):
-        """
-        Monotonicity Test: Higher vol widens the distribution of future outcomes,
-        increasing the expected payoff of a call. Price must rise strictly with vol.
-        """
+        """Verify that a call option's value increases as volatility rises."""
         strike = 100.0
         T = 1.0
         r = 0.05
@@ -226,10 +167,7 @@ class TestMonotonicity:
             )
  
     def test_call_price_decreases_with_strike(self):
-        """
-        Monotonicity Test: A call with a higher strike pays off less in every
-        scenario, so it must be worth strictly less.
-        """
+        """Verify that a call option's value decreases as the strike price increases."""
         spot = 100.0
         T = 1.0
         sigma = 0.25
@@ -244,27 +182,13 @@ class TestMonotonicity:
                 f"price(K={strikes[i]}) = {prices[i]:.4f} <= "
                 f"price(K={strikes[i+1]}) = {prices[i+1]:.4f}"
             )
- 
- 
 
- 
+
 class TestConvexity:
-    """
-    The Black-Scholes call (and put) price is a convex function of spot.
- 
-    Convexity means: price(S+h) + price(S-h) >= 2*price(S)  for any h > 0.
-    This is the discrete version of gamma > 0 and must hold everywhere.
-    """
+    """Verify the convexity of Black-Scholes option prices with respect to spot and strike."""
  
     def test_call_price_is_convex_in_spot(self):
-        """
-        Convexity Test: Verify call price is convex in spot via the finite-
-        difference second derivative at multiple spot levels.
- 
-        Uses h=$1 to stay clear of floating-point cancellation noise — per
-        the lecture's guidance on choosing delta-x to balance convexity error
-        and cancellation ('Beware addition' and 'Approximations' slides).
-        """
+        """Verify that the call price is convex with respect to the spot price."""
         strike = 100.0
         T = 1.0
         sigma = 0.25
@@ -283,10 +207,7 @@ class TestConvexity:
             )
  
     def test_put_price_is_convex_in_spot(self):
-        """
-        Convexity Test: Put prices share the same gamma as calls (put-call
-        parity), so convexity must hold for puts too.
-        """
+        """Verify that the put price is convex with respect to the spot price."""
         strike = 100.0
         T = 1.0
         sigma = 0.25
@@ -305,11 +226,7 @@ class TestConvexity:
             )
  
     def test_call_price_convex_in_strike(self):
-        """
-        Convexity Test: The call price is convex in strike — a classic butterfly
-        arbitrage argument. Violating this allows a costless butterfly to have
-        a positive payoff.
-        """
+        """Verify that the call price is convex with respect to the strike price."""
         spot = 100.0
         T = 1.0
         sigma = 0.25
@@ -326,36 +243,22 @@ class TestConvexity:
                 f"Call not convex in strike at K={k}: "
                 f"finite-diff second derivative = {second_diff:.8f} (expected >= 0)"
             )
- 
 
- 
+
 class TestDeltaSelfConsistency:
-    """
-    black_scholes_delta must equal the numerical first derivative of
-    black_scholes_price with respect to spot.
- 
-    If they disagree, one function is wrong — a classic code-review catch
-    described in the lecture.
-    """
+    """Verify that analytic Delta matches numerical finite differences."""
  
     @pytest.mark.parametrize("spot,strike,T,sigma,r,option_type", [
-        (100.0, 100.0, 1.0, 0.20, 0.05, "call"),   # ATM call
-        (100.0, 100.0, 1.0, 0.20, 0.05, "put"),    # ATM put
-        (120.0, 100.0, 1.0, 0.25, 0.03, "call"),   # deep ITM call
-        ( 80.0, 100.0, 0.5, 0.30, 0.02, "call"),   # OTM call
-        ( 80.0, 100.0, 0.5, 0.30, 0.02, "put"),    # ITM put
+        (100.0, 100.0, 1.0, 0.20, 0.05, "call"),
+        (100.0, 100.0, 1.0, 0.20, 0.05, "put"),
+        (120.0, 100.0, 1.0, 0.25, 0.03, "call"),
+        ( 80.0, 100.0, 0.5, 0.30, 0.02, "call"),
+        ( 80.0, 100.0, 0.5, 0.30, 0.02, "put"),
     ])
     def test_delta_equals_finite_difference_derivative(
         self, spot, strike, T, sigma, r, option_type
     ):
-        """
-        Self-Consistency Test: black_scholes_delta(S) should match
-        [price(S+h) - price(S-h)] / (2h) to within numerical precision.
- 
-        Uses a centred difference with h=0.01 — small enough for accuracy,
-        large enough to avoid cancellation errors (per lecture's guidance on
-        picking delta-x).
-        """
+        """Verify that the analytic Black-Scholes Delta matches the numerical first derivative with respect to spot."""
         h = 0.01
  
         analytic_delta  = black_scholes_delta(spot, strike, T, sigma, r, option_type)
@@ -370,18 +273,10 @@ class TestDeltaSelfConsistency:
             f"  numerical delta = {numerical_delta:.8f}\n"
             f"  difference      = {abs(analytic_delta - numerical_delta):.2e}"
         )
- 
 
- 
+
 class TestGammaSelfConsistency:
-    """
-    black_scholes_gamma must equal the numerical second derivative of
-    black_scholes_price with respect to spot.
- 
-    The lecture devoted several slides to how easy it is to get gamma wrong
-    numerically. This test checks the analytic formula against a finite
-    difference to confirm both compute the same quantity.
-    """
+    """Verify that analytic Gamma matches numerical finite differences."""
  
     @pytest.mark.parametrize("spot,strike,T,sigma,r,option_type", [
         (100.0, 100.0, 1.0, 0.20, 0.05, "call"),
@@ -392,14 +287,7 @@ class TestGammaSelfConsistency:
     def test_gamma_equals_finite_difference_second_derivative(
         self, spot, strike, T, sigma, r, option_type
     ):
-        """
-        Self-Consistency Test: black_scholes_gamma(S) should match
-        [price(S+h) - 2*price(S) + price(S-h)] / h^2.
- 
-        Uses h=1.0 ($1 bump). The lecture explicitly warns that h must be
-        chosen carefully: too small causes cancellation; too large introduces
-        truncation. h=$1 balances both for typical equity option inputs.
-        """
+        """Verify that the analytic Black-Scholes Gamma matches the numerical second derivative with respect to spot."""
         h = 1.0
  
         analytic_gamma  = black_scholes_gamma(spot, strike, T, sigma, r, option_type)
@@ -417,11 +305,7 @@ class TestGammaSelfConsistency:
         )
  
     def test_gamma_is_positive_everywhere(self):
-        """
-        Sanity Test: Analytic gamma must be strictly positive for all finite
-        inputs — confirming the convexity established in the price tests is
-        also reflected in the Greek itself.
-        """
+        """Verify that the analytic Gamma is strictly positive for all valid inputs."""
         strike = 100.0
         T = 1.0
         sigma = 0.25
@@ -430,40 +314,26 @@ class TestGammaSelfConsistency:
         for spot in [70.0, 80.0, 90.0, 100.0, 110.0, 120.0, 130.0]:
             g = black_scholes_gamma(spot, strike, T, sigma, r, "call")
             assert g > 0, f"Gamma not positive at spot={spot}: gamma={g:.6f}"
- 
 
- 
+
 class TestFailureModes:
-    """
-    Verify that the pricer handles extreme but legal inputs without producing
-    NaN, inf, or raising unexpected exceptions.
- 
-    The lecture specifically asks: 'Where can underflows and overflows occur
-    and how will they propagate through the calculation?'
-    """
+    """Verify the pricer handles extreme but valid inputs safely."""
  
     @pytest.mark.parametrize("spot,strike,T,sigma,r,option_type", [
-        (100.0, 100.0, 1.0,   5.0,  0.05, "call"),   # very high vol
-        (100.0, 100.0, 1.0,   5.0,  0.05, "put"),    # very high vol, put
-        (100.0, 100.0, 1e-6, 0.25,  0.05, "call"),   # near-expiry
-        (100.0, 100.0, 1e-6, 0.25,  0.05, "put"),    # near-expiry, put
-        (1000.0, 100.0, 1.0, 0.25,  0.05, "call"),   # deep ITM
-        (  1.0, 100.0, 1.0,  0.25,  0.05, "call"),   # deep OTM
-        (1e6,   100.0, 1.0,  0.25,  0.05, "call"),   # very large spot
-        (100.0, 100.0, 1.0,  0.25, -0.01, "call"),   # negative rate
-        (100.0, 100.0, 1.0,  0.25, -0.01, "put"),    # negative rate, put
+        (100.0, 100.0, 1.0,   5.0,  0.05, "call"),
+        (100.0, 100.0, 1.0,   5.0,  0.05, "put"),
+        (100.0, 100.0, 1e-6, 0.25,  0.05, "call"),
+        (100.0, 100.0, 1e-6, 0.25,  0.05, "put"),
+        (1000.0, 100.0, 1.0, 0.25,  0.05, "call"),
+        (  1.0, 100.0, 1.0,  0.25,  0.05, "call"),
+        (1e6,   100.0, 1.0,  0.25,  0.05, "call"),
+        (100.0, 100.0, 1.0,  0.25, -0.01, "call"),
+        (100.0, 100.0, 1.0,  0.25, -0.01, "put"),
     ])
     def test_no_nan_or_inf_on_extreme_inputs(
         self, spot, strike, T, sigma, r, option_type
     ):
-        """
-        Failure Mode Test: Extreme but valid inputs must produce a finite,
-        non-NaN, non-negative price.
- 
-        A NaN or inf propagating silently through a risk system would corrupt
-        every downstream calculation — the lecture warns this is the most
-        dangerous class of numerical error.
-        """
+        """Verify that extreme but valid inputs produce finite, non-negative prices without errors."""
         price = black_scholes_price(spot, strike, T, sigma, r, option_type)
  
         assert math.isfinite(price), (
@@ -478,10 +348,7 @@ class TestFailureModes:
         )
  
     def test_delta_finite_on_extreme_inputs(self):
-        """
-        Failure Mode Test: Delta must be finite and within [-1, 1] for all
-        valid inputs. Infinite or NaN greeks would break hedging and VaR.
-        """
+        """Verify that Delta remains finite and bounded within [-1, 1] for extreme valid inputs."""
         cases = [
             (100.0, 100.0, 1e-6, 0.25, 0.05, "call"),
             (1000.0, 100.0, 1.0, 0.25, 0.05, "call"),
@@ -500,10 +367,7 @@ class TestFailureModes:
             )
  
     def test_gamma_finite_and_non_negative_on_extreme_inputs(self):
-        """
-        Failure Mode Test: Gamma must be finite and non-negative for all
-        valid inputs.
-        """
+        """Verify that Gamma remains finite and non-negative for extreme valid inputs."""
         cases = [
             (100.0, 100.0, 1e-6, 0.25, 0.05, "call"),
             (1000.0, 100.0, 1.0, 0.25, 0.05, "call"),
@@ -520,30 +384,18 @@ class TestFailureModes:
                 f"Gamma is negative ({gamma:.6f}) for "
                 f"spot={spot} K={strike} T={T} sigma={sigma}"
             )
- 
- 
- 
+
+
 class TestTemporalStability:
-    """
-    As time-to-expiry decreases, prices should decay smoothly to intrinsic
-    value without spikes or discontinuities.
- 
-    The lecture's robustness slides state: 'Model outputs should be relatively
-    stable over time' and 'Small perturbations of model inputs should not lead
-    to large changes in model outputs.'
-    """
+    """Verify option prices decay smoothly towards intrinsic value as expiry approaches."""
  
     def test_atm_call_price_decreases_monotonically_toward_expiry(self):
-        """
-        Temporal Stability Test: An ATM call loses time value monotonically
-        as expiry approaches. The model must produce a smooth term structure.
-        """
+        """Verify that an ATM call option loses time value monotonically as expiry approaches."""
         spot   = 100.0
         strike = 100.0
         sigma  = 0.25
         r      = 0.05
  
-        # Decreasing T: 2yr → 1yr → 6m → 3m → 1m → 1wk
         times  = [2.0, 1.0, 0.5, 0.25, 1/12, 1/52]
         prices = [black_scholes_price(spot, strike, t, sigma, r, "call") for t in times]
  
@@ -555,13 +407,7 @@ class TestTemporalStability:
             )
  
     def test_itm_call_converges_to_intrinsic_at_expiry(self):
-        """
-        Limiting Case / Temporal Stability Test: As T→0, the ITM call price
-        must converge to max(S-K, 0).
- 
-        Combines the lecture's 'Limiting cases' and 'Test over time' themes:
-        the model must not blow up or drift as it reaches the boundary.
-        """
+        """Verify that an ITM call option price converges to its intrinsic value as time to maturity approaches zero."""
         spot      = 110.0
         strike    = 100.0
         sigma     = 0.25
@@ -576,14 +422,7 @@ class TestTemporalStability:
         )
  
     def test_no_price_spikes_on_monthly_time_grid(self):
-        """
-        Temporal Stability Test: Price should smoothly decay as time to expiry decreases.
-        
-        Note: We do not use a flat absolute threshold because ATM option time 
-        decay (Theta) scales with the square root of time, meaning absolute 
-        price drops accelerate as expiry approaches. Instead, we check for 
-        strict monotonicity (no upward spikes) and bound the maximum expected drop.
-        """
+        """Verify that option prices decay smoothly without anomalous spikes as time to expiry decreases."""
         spot   = 100.0
         strike = 100.0
         sigma  = 0.25

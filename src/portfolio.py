@@ -10,10 +10,12 @@ from .pricing import black_scholes_delta, black_scholes_price
 
 
 def get_underlyings(portfolio_df: pd.DataFrame) -> list[str]:
+    """Extract a sorted list of unique underlying asset tickers from the portfolio."""
     return sorted(portfolio_df["underlying"].dropna().astype(str).unique().tolist())
 
 
 def _time_to_maturity(valuation_date: datetime, maturity: pd.Timestamp) -> float:
+    """Calculate the time to maturity in years between the valuation date and the maturity date."""
     if pd.isna(maturity):
         return 0.0
     delta_days = (pd.Timestamp(maturity) - pd.Timestamp(valuation_date)).days
@@ -21,6 +23,7 @@ def _time_to_maturity(valuation_date: datetime, maturity: pd.Timestamp) -> float
 
 
 def value_instrument(row: pd.Series, spot_prices: dict[str, float], valuation_date: datetime) -> float:
+    """Calculate the monetary value of a single instrument (stock or option) based on current spot prices."""
     underlying = row["underlying"]
     if underlying not in spot_prices:
         raise ValueError(f"Missing spot price for underlying '{underlying}'.")
@@ -41,12 +44,14 @@ def value_instrument(row: pd.Series, spot_prices: dict[str, float], valuation_da
 
 
 def value_portfolio(portfolio_df: pd.DataFrame, spot_prices: dict[str, float], valuation_date: datetime) -> float:
+    """Calculate the total aggregate value of the entire portfolio."""
     return float(
         sum(value_instrument(row, spot_prices, valuation_date) for _, row in portfolio_df.iterrows())
     )
 
 
 def portfolio_delta_exposures(portfolio_df: pd.DataFrame, spot_prices: dict[str, float], valuation_date: datetime) -> dict[str, float]:
+    """Calculate the aggregate delta exposure for each underlying asset in the portfolio."""
     exposures: dict[str, float] = {}
     for _, row in portfolio_df.iterrows():
         underlying = row["underlying"]
@@ -68,4 +73,3 @@ def portfolio_delta_exposures(portfolio_df: pd.DataFrame, spot_prices: dict[str,
 
         exposures[underlying] = exposures.get(underlying, 0.0) + position * delta
     return exposures
-

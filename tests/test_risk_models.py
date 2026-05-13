@@ -19,6 +19,7 @@ from src.risk_models import (
 
 
 def test_log_returns_shape_is_correct():
+    """Verify that computing log returns yields N-1 rows and the same number of columns."""
     prices = load_price_history("data/sample_historical_prices.csv")
     returns = compute_log_returns(prices)
     assert returns.shape[0] == prices.shape[0] - 1
@@ -26,6 +27,7 @@ def test_log_returns_shape_is_correct():
 
 
 def test_covariance_matrix_has_correct_dimensions():
+    """Verify that the calibrated covariance matrix is a square matrix matching the number of assets."""
     prices = load_price_history("data/sample_historical_prices.csv")
     calib = calibrate_from_history(prices)
     cov = calib["daily_cov_matrix"]
@@ -33,6 +35,7 @@ def test_covariance_matrix_has_correct_dimensions():
 
 
 def test_risk_models_and_report(tmp_path):
+    """Verify that all core VaR models produce non-negative outputs and can be serialized to a CSV report."""
     portfolio_df = load_portfolio("data/sample_portfolio.csv")
     prices = load_price_history("data/sample_historical_prices.csv")
     spot_prices = prices.iloc[-1].to_dict()
@@ -53,6 +56,7 @@ def test_risk_models_and_report(tmp_path):
 
 
 def test_negative_prices_are_rejected(tmp_path):
+    """Ensure the system rejects negative prices during data loading to prevent log math errors."""
     csv = tmp_path / "bad_prices.csv"
   
     csv.write_text(
@@ -66,13 +70,9 @@ def test_negative_prices_are_rejected(tmp_path):
 
 
 def test_robustness_extreme_outlier_shock():
-    """
-    Data Robustness Test: Verify how the model behaves with an extreme
-    historical outlier (e.g., a 90% crash in a single day).
-    The system must not crash by calculating standard deviations of NaNs.
-    """
+    """Verify the calibration engine handles extreme price shocks without producing NaNs."""
     df_outlier = pd.DataFrame({
-        "AAPL": [100.0, 10.0, 10.5]  # 3 prices
+        "AAPL": [100.0, 10.0, 10.5]  
     }, index=pd.to_datetime(["2026-01-01", "2026-01-02", "2026-01-03"]))
     
     calib = calibrate_from_history(df_outlier)
@@ -81,10 +81,7 @@ def test_robustness_extreme_outlier_shock():
 
 
 def test_robustness_covariance_short_window():
-    """
-    Operational Limits Test: Verify the stability of the covariance matrix
-    when the historical sample is extremely short (e.g., only 3 days of data).
-    """
+    """Verify covariance matrix computation remains stable and non-null even with minimal historical data."""
     df_short = pd.DataFrame({
         "AAPL": [100.0, 102.0, 101.0],
         "MSFT": [200.0, 205.0, 203.0]
@@ -96,8 +93,9 @@ def test_robustness_covariance_short_window():
     assert cov.shape == (2, 2)
     assert not cov.isnull().any().any()
 
+
 def test_dynamic_volatility_leverage_effect():
-    """Verify that a drop in stock price causes implied volatility to rise."""
+    """Verify that a simulated drop in stock price correctly triggers an increase in option implied volatility."""
    
     portfolio_df = pd.DataFrame({
         "type": ["option"],
@@ -115,58 +113,41 @@ def test_dynamic_volatility_leverage_effect():
     assert shocked_vol > 0.20  
     assert abs(shocked_vol - expected_vol) < 1e-6
 
+
 def test_monte_carlo_var_converges_with_more_simulations():
-        """
-        Numerical Convergence Test: Verify that Monte Carlo VaR stabilizes
-        as simulations increase (internal convergence). 
-        
-        A 2,000-simulation run should produce a result much closer to the 
-        10,000-simulation baseline than a noisy 100-simulation run.
-        """
-        prices = load_price_history("data/sample_historical_prices.csv")
-        portfolio_df = load_portfolio("data/sample_portfolio.csv")
-        spot_prices = prices.iloc[-1].to_dict()
-        calibration_result = calibrate_from_history(prices)
-        valuation_date = datetime(2026, 5, 11)
+    """Verify that increasing the number of Monte Carlo simulations reduces the error relative to a high-sim baseline."""
+    prices = load_price_history("data/sample_historical_prices.csv")
+    portfolio_df = load_portfolio("data/sample_portfolio.csv")
+    spot_prices = prices.iloc[-1].to_dict()
+    calibration_result = calibrate_from_history(prices)
+    valuation_date = datetime(2026, 5, 11)
 
-        var_100 = monte_carlo_var_es(
-            portfolio_df, spot_prices, calibration_result, valuation_date,
-            n_sims=100, random_seed=42
-        )["VaR"]
+    var_100 = monte_carlo_var_es(
+        portfolio_df, spot_prices, calibration_result, valuation_date,
+        n_sims=100, random_seed=42
+    )["VaR"]
 
-        var_2000 = monte_carlo_var_es(
-            portfolio_df, spot_prices, calibration_result, valuation_date,
-            n_sims=2000, random_seed=42
-        )["VaR"]
+    var_2000 = monte_carlo_var_es(
+        portfolio_df, spot_prices, calibration_result, valuation_date,
+        n_sims=2000, random_seed=42
+    )["VaR"]
 
-        var_10000 = monte_carlo_var_es(
-            portfolio_df, spot_prices, calibration_result, valuation_date,
-            n_sims=10000, random_seed=42
-        )["VaR"]
+    var_10000 = monte_carlo_var_es(
+        portfolio_df, spot_prices, calibration_result, valuation_date,
+        n_sims=10000, random_seed=42
+    )["VaR"]
 
-        error_100 = abs(var_100 - var_10000)
-        error_2000 = abs(var_2000 - var_10000)
+    error_100 = abs(var_100 - var_10000)
+    error_2000 = abs(var_2000 - var_10000)
 
-        assert error_2000 < error_100, (
-            f"Expected internal convergence: 2k sim error ({error_2000:.2f}) "
-            f"should be smaller than 100 sim error ({error_100:.2f})"
-        )
+    assert error_2000 < error_100, (
+        f"Expected internal convergence: 2k sim error ({error_2000:.2f}) "
+        f"should be smaller than 100 sim error ({error_100:.2f})"
+    )
+
 
 def test_var_sensitivity_to_calibration_window():
-    """
-    Robustness Test: VaR estimates must change meaningfully when the calibration
-    window is shortened from 250 days to 60 days, confirming the model is
-    sensitive to the calibration period as expected.
-
-    A shorter window uses only recent return history. If recent volatility
-    differs from the full-history average, the two VaR estimates should diverge.
-    This test asserts they are not identical, demonstrating that the calibration
-    window is a live, impactful parameter rather than a cosmetic setting.
-
-    Uses the real sample data so the test reflects actual market dynamics.
-    """
-    
-
+    """Verify that VaR outputs are sensitive to changes in the historical calibration window length."""
     prices = load_price_history("data/sample_historical_prices.csv")
     portfolio_df = load_portfolio("data/sample_portfolio.csv")
     valuation_date = datetime(2026, 5, 11)
@@ -187,24 +168,9 @@ def test_var_sensitivity_to_calibration_window():
     print(f"  VaR  (60-day window): {var_60:.2f}")
     print(f"  Difference: {abs(var_250 - var_60):.2f}")
 
+
 def test_leverage_effect_increases_var_for_negative_scenarios():
-    """
-    Assumption Impact Test: Verify that the leverage effect adjustment
-    (lambda=0.5) produces a higher VaR than running with no vol adjustment.
-
-    This directly tests the impact of the assumption documented in
-    model_documentation.md section J.1: when spot prices fall, implied
-    volatility rises, which amplifies option losses and raises VaR.
-    Removing the adjustment should produce a lower (less conservative) VaR.
-
-    Method:
-      - Run historical_var_es normally (leverage adjustment active).
-      - Monkey-patch _shock_portfolio_volatility to return the portfolio
-        unchanged (no vol adjustment).
-      - Assert adjusted VaR >= unadjusted VaR.
-    """
-
-
+    """Verify that the dynamic volatility adjustment (leverage effect) produces a more conservative higher VaR."""
     prices = load_price_history("data/sample_historical_prices.csv")
     portfolio_df = load_portfolio("data/sample_portfolio.csv")
     valuation_date = datetime(2026, 5, 11)
@@ -232,16 +198,9 @@ def test_leverage_effect_increases_var_for_negative_scenarios():
     print(f"  VaR without adjustment:           {var_without_adjustment:.2f}")
     print(f"  VaR increase from assumption:     {var_with_adjustment - var_without_adjustment:.2f}")
 
+
 def test_covariance_stability_under_small_price_perturbation():
-    """
-    Parameter Stability Test (input perturbation → parameter change).
- 
-    A 0.1% uniform price perturbation applied to the full price history
-    should not materially change any entry of the calibrated daily covariance
-    matrix. We require every absolute difference to remain below 1e-6,
-    confirming the calibration is numerically stable and not chaotically
-    sensitive to small data changes.
-    """
+    """Verify that a minor, uniform input perturbation does not trigger disproportionate changes in the calibrated covariance matrix."""
     prices = load_price_history("data/sample_historical_prices.csv")
  
     perturbed_prices = prices * 1.001         
@@ -264,13 +223,7 @@ def test_covariance_stability_under_small_price_perturbation():
  
  
 def test_ewma_covariance_stability_under_small_price_perturbation():
-    """
-    Parameter Stability Test — EWMA variant.
- 
-    Same as the equally-weighted test above but for ewma_calibrate.
-    EWMA down-weights old observations, so the covariance should be at
-    least as stable as the equally-weighted estimate under a uniform shock.
-    """
+    """Verify that a minor, uniform input perturbation does not trigger disproportionate changes in the EWMA covariance matrix."""
     from src.calibration import ewma_calibrate
  
     prices = load_price_history("data/sample_historical_prices.csv")
@@ -293,18 +246,8 @@ def test_ewma_covariance_stability_under_small_price_perturbation():
     print(f"  Max absolute cov entry change: {max_diff:.2e}  (threshold: 1e-6)")
  
  
- 
 def test_var_output_stability_under_small_spot_perturbation():
-    """
-    Output Stability Test (input perturbation → output change).
- 
-    A 0.1% uniform shift in all current spot prices should not cause VaR
-    to change by more than 2% relative to the base VaR. This confirms the
-    risk output is not chaotically sensitive to minor data revisions —
-    a key model validation criterion.
- 
-    Tested across all six model variants.
-    """
+    """Verify that a minor spot price perturbation yields stable, proportionally small changes in VaR output across all models."""
     from src.calibration import ewma_calibrate
     from src.risk_models import (
         ewma_historical_var_es, ewma_parametric_var, ewma_monte_carlo_var_es,
@@ -360,19 +303,8 @@ def test_var_output_stability_under_small_spot_perturbation():
         )
  
  
- 
 def test_calibrated_covariance_stable_over_rolling_windows():
-    """
-    Parameter Stability Over Time Test.
- 
-    Calibrates the covariance matrix on three consecutive non-overlapping
-    60-day windows near the end of the price history and checks that no
-    single covariance entry fluctuates by more than 5× the median entry
-    value across the three windows. This confirms internal parameters do
-    not swing wildly from one period to the next under normal conditions.
- 
-    Tested for both equally-weighted and EWMA calibration.
-    """
+    """Verify that covariance matrix entries do not exhibit extreme instability when calibrated across consecutive rolling windows."""
     from src.calibration import ewma_calibrate
  
     prices  = load_price_history("data/sample_historical_prices.csv")
@@ -410,21 +342,8 @@ def test_calibrated_covariance_stable_over_rolling_windows():
               f"(threshold: {max_allowed_swing:.2e})")
  
  
- 
 def test_var_output_stable_over_rolling_windows():
-    """
-    Output Stability Over Time Test.
- 
-    Runs historical VaR and EWMA historical VaR on three consecutive
-    non-overlapping 60-day calibration windows and verifies that the
-    VaR estimate does not jump by more than 100% from one window to the
-    next under normal market conditions.
- 
-    A 100% tolerance is intentionally generous — this test is designed
-    to catch pathological instability (e.g. a 10× spike), not to penalise
-    natural variation across periods. Tighter bounds would be applied
-    in a production review; this establishes a minimum sanity floor.
-    """
+    """Verify that calculated VaR does not jump pathologically across consecutive, non-overlapping rolling windows."""
     from src.risk_models import ewma_historical_var_es
  
     prices    = load_price_history("data/sample_historical_prices.csv")

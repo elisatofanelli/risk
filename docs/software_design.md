@@ -25,7 +25,7 @@ The goal is to keep responsibilities separated so each module is highly cohesive
 ---
 
 ### `src/market_data.py`
-- **Purpose:** Loads historical price data from a CSV, validates temporal formatting, and ensures all price values are strictly positive to prevent logarithmic mathematical errors.
+- **Purpose:** Loads historical price data from a CSV, validates temporal formatting and ensures all price values are strictly positive to prevent logarithmic mathematical errors.
 - **Assumptions:** Assumes the CSV contains a 'date' column and one column per underlying ticker. Assumes all prices are strictly positive (no zero or negative prices) and chronological.
 - **Interfaces:** Exports `load_price_history(path: str) -> pd.DataFrame`.
 - **Data Structures:** Reads from a CSV format (`date, AAPL, MSFT, SPY`). Returns a date-indexed pandas `DataFrame` populated with float values for asset prices.
@@ -34,9 +34,9 @@ The goal is to keep responsibilities separated so each module is highly cohesive
 
 ### `src/calibration.py`
 - **Purpose:** Computes log returns from historical price series and estimates key statistical parameters (mean, covariance, volatility, correlation) needed for parametric and Monte Carlo risk models. Produces both daily and annualized metrics. Also implements EWMA-based calibration as an alternative to equally-weighted historical estimation.
-- **Assumptions:** Assumes the input price data is clean, chronological, strictly positive, and contains no missing values. Assumes stationarity of returns over the calibration window. The annualization factor defaults to 252 trading days. EWMA calibration additionally requires the decay parameter λ ∈ (0, 1).
+- **Assumptions:** Assumes the input price data is clean, chronological, strictly positive and contains no missing values. Assumes stationarity of returns over the calibration window. The annualization factor defaults to 252 trading days. EWMA calibration additionally requires the decay parameter λ ∈ (0, 1).
 - **Interfaces:** Exports `compute_log_returns(price_df)`, `calibrate_from_history(price_df, annualization_factor)`, `ewma_calibrate(price_df, lam, annualization_factor)`, and `load_user_params(mean_path, cov_path)`.
-- **Data Structures:** Takes a date-indexed pandas `DataFrame` as input. Both `calibrate_from_history` and `ewma_calibrate` return a Python `dict` with the same schema — pandas `Series` for vectors (means, volatilities) and pandas `DataFrames` for matrices (covariance, correlation) — making them drop-in substitutes for all downstream consumers. `ewma_calibrate` additionally includes `ewma_lambda` (the λ used) and `ewma_weights` (a `Series` of per-observation normalised weights indexed by date).
+- **Data Structures:** Takes a date-indexed pandas `DataFrame` as input. Both `calibrate_from_history` and `ewma_calibrate` return a Python `dict` with the same schema, pandas `Series` for vectors (means, volatilities) and pandas `DataFrames` for matrices (covariance, correlation), making them drop-in substitutes for all downstream consumers. `ewma_calibrate` additionally includes `ewma_lambda` (the λ used) and `ewma_weights` (a `Series` of per-observation normalised weights indexed by date).
 
 #### Mathematical Specification
 
@@ -82,7 +82,7 @@ No Bessel correction is applied, consistent with standard EWMA estimator practic
 - **Purpose:** Implements Black-Scholes analytical formulas to calculate the price and delta of European options (calls and puts), incorporating strict mathematical edge-case validation.
 - **Assumptions:** Assumes European exercise only, constant risk-free rate, constant volatility, lognormal asset dynamics, and no dividends. Assumes inputs (spot, strike, vol) are strictly positive.
 - **Interfaces:** Exports `black_scholes_price(...)`, `black_scholes_delta(...)`, and `black_scholes_gamma(...)`.
-- **Data Structures:** Takes standard Python `float` and `str` types as inputs. Returns a single `float` representing the option's theoretical price, delta, or gamma.
+- **Data Structures:** Takes standard Python `float` and `str` types as inputs. Returns a single `float` representing the option's theoretical price, delta or gamma.
 
 #### Mathematical Specification
 
@@ -173,7 +173,7 @@ $$\text{ES}_\alpha = \frac{1}{|\mathcal{T}|}\sum_{t \in \mathcal{T}} L_t, \quad 
 
 where $\alpha$ is the confidence level (0.95) and $L_{(k)}$ denotes the $k$-th order statistic.
 
-**Parametric (Delta-Normal) VaR**
+**Parametric VaR**
 
 The portfolio dollar-delta vector $\boldsymbol{\delta} \in \mathbb{R}^N$ (one entry per underlying) is assembled from `portfolio_delta_exposures`. The one-day portfolio variance and mean are:
 

@@ -13,6 +13,7 @@ from .portfolio import portfolio_delta_exposures, value_portfolio
 
 
 def _loss_summary(losses: np.ndarray, confidence_level: float, current_value: float) -> dict:
+    """Calculate Value at Risk (VaR) and Expected Shortfall (ES) from a raw array of simulated or historical losses."""
     var = float(np.quantile(losses, confidence_level))
     tail = losses[losses >= var]
     es = float(tail.mean()) if len(tail) else var
@@ -25,11 +26,7 @@ def _loss_summary(losses: np.ndarray, confidence_level: float, current_value: fl
 
 
 def _shock_portfolio_volatility(portfolio_df: pd.DataFrame, log_returns: dict[str, float]) -> pd.DataFrame:
-    """
-    Dynamically adjust option implied volatility based on underlying spot shocks.
-    Uses a standard leverage effect heuristic: volatility increases when spot drops.
-    Formula: new_vol = original_vol * exp(-0.5 * log_return)
-    """
+    """Dynamically adjust option implied volatility using a leverage effect heuristic where volatility increases as spot drops."""
     shocked_df = portfolio_df.copy()
     option_mask = shocked_df["type"] == "option"
 
@@ -46,6 +43,7 @@ def _shock_portfolio_volatility(portfolio_df: pd.DataFrame, log_returns: dict[st
 
 
 def historical_var_es(portfolio_df, price_history_df, valuation_date, confidence_level=0.95) -> dict:
+    """Calculate VaR and ES using historical simulation by replaying past daily log returns against the current portfolio."""
     price_history = price_history_df.copy()
     log_returns = compute_log_returns(price_history).dropna(how="any")
     if log_returns.empty:
@@ -82,6 +80,7 @@ def monte_carlo_var_es(
     n_sims=10000,
     random_seed=42,
 ) -> dict:
+    """Calculate VaR and ES using Monte Carlo simulation by generating multivariate normal return scenarios."""
     underlying_order = list(spot_prices.keys())
     mean = calibration_result["daily_mean_returns"].reindex(underlying_order).fillna(0.0).values
     cov = calibration_result["daily_cov_matrix"].reindex(index=underlying_order, columns=underlying_order).fillna(0.0).values
@@ -117,6 +116,7 @@ def parametric_var(
     valuation_date,
     confidence_level=0.95,
 ) -> dict:
+    """Calculate VaR using the Delta-Normal parametric approximation based on portfolio sensitivities and a covariance matrix."""
     exposures = portfolio_delta_exposures(portfolio_df, spot_prices, valuation_date)
     underlying_order = list(spot_prices.keys())
     exposure_vector = np.array(
@@ -140,6 +140,7 @@ def parametric_var(
     portfolio_std = sqrt(max(portfolio_var_scalar, 0.0))
     z_score = float(norm.ppf(confidence_level))
     var = max(z_score * portfolio_std - portfolio_mean, 0.0)
+    
 
     current_value = value_portfolio(portfolio_df, spot_prices, valuation_date)
     return {
@@ -155,25 +156,7 @@ def _weighted_loss_summary(
     confidence_level: float,
     current_value: float,
 ) -> dict:
-    """
-    Compute VaR and ES from a weighted loss distribution.
-
-    VaR is the weighted quantile: the smallest loss L such that the cumulative
-    EWMA weight of scenarios with loss ≤ L is ≥ confidence_level.
-    ES is the weighted average of losses that exceed the VaR threshold.
-
-    Parameters
-    ----------
-    losses : np.ndarray
-        Per-scenario loss values (positive = loss).
-    weights : np.ndarray
-        Non-negative EWMA weights corresponding to each scenario; need not sum to 1
-        (they are re-normalised internally).
-    confidence_level : float
-        E.g. 0.95 for 95% VaR.
-    current_value : float
-        Current mark-to-market portfolio value (stored for reporting).
-    """
+    """Calculate VaR and ES from a loss distribution where each scenario is assigned a specific probability weight."""
     weights = np.asarray(weights, dtype=float)
     weights = weights / weights.sum()
 
@@ -207,32 +190,7 @@ def ewma_historical_var_es(
     confidence_level: float = 0.95,
     lam: float = 0.94,
 ) -> dict:
-    """
-    EWMA-weighted historical simulation VaR and ES.
-
-    Identical to ``historical_var_es`` in scenario construction (each past
-    log-return window is replayed against today's portfolio) but instead of
-    assigning equal probability 1/T to every scenario, each scenario receives
-    an EWMA weight λ^(T-1-t) (normalised).  More recent history therefore
-    dominates the loss distribution, making VaR and ES more responsive to
-    recent volatility regimes.
-
-    Volatility surface shocks (leverage-effect adjustment on implied vol) are
-    applied identically to the plain historical method.
-
-    Parameters
-    ----------
-    portfolio_df : pd.DataFrame
-        Portfolio positions (same schema as used throughout the engine).
-    price_history_df : pd.DataFrame
-        Full price history; columns = underlyings, rows = dates (ascending).
-    valuation_date : datetime
-        Date used for option pricing (time-to-expiry calculation).
-    confidence_level : float
-        VaR/ES confidence level, e.g. 0.95.
-    lam : float
-        EWMA decay factor λ ∈ (0, 1).  Default 0.94 (RiskMetrics daily).
-    """
+    """Calculate VaR and ES using historical simulation with EWMA probabilities applied to recent scenarios."""
     if not (0.0 < lam < 1.0):
         raise ValueError(f"lam must be in (0, 1), got {lam}")
 
@@ -274,35 +232,7 @@ def ewma_parametric_var(
     confidence_level: float = 0.95,
     lam: float = 0.94,
 ) -> dict:
-    """
-    Parametric (delta-normal) VaR and ES using an EWMA covariance matrix.
-
-    Replaces the equally-weighted sample covariance in ``parametric_var`` with
-    an EWMA covariance matrix, making the risk estimate more sensitive to
-    recent volatility clustering.  The analytical delta-normal formula is
-    otherwise unchanged:
-
-        VaR = z_α · σ_P − μ_P
-        ES  = −μ_P + σ_P · φ(z_α) / (1 − α)
-
-    where σ_P and μ_P are the EWMA-based portfolio standard deviation and mean
-    computed from the delta-exposure vector.
-
-    Parameters
-    ----------
-    portfolio_df : pd.DataFrame
-        Portfolio positions.
-    spot_prices : dict[str, float]
-        Current spot prices keyed by underlying ticker.
-    price_history_df : pd.DataFrame
-        Price history used to compute the EWMA calibration.
-    valuation_date : datetime
-        Pricing date for options.
-    confidence_level : float
-        VaR/ES confidence level, e.g. 0.95.
-    lam : float
-        EWMA decay factor λ ∈ (0, 1).  Default 0.94.
-    """
+    """Calculate Parametric (Delta-Normal) VaR using an EWMA-calibrated covariance matrix to emphasize recent volatility."""
     calibration_result = ewma_calibrate(price_history_df, lam=lam)
     result = parametric_var(
         portfolio_df, spot_prices, calibration_result, valuation_date, confidence_level
@@ -321,35 +251,7 @@ def ewma_monte_carlo_var_es(
     n_sims: int = 10_000,
     random_seed: int = 42,
 ) -> dict:
-    """
-    Monte Carlo VaR and ES driven by an EWMA covariance matrix.
-
-    Identical in structure to ``monte_carlo_var_es``: multivariate normal
-    log-returns are simulated and replayed against the current portfolio
-    (with implied-vol shocks).  The key difference is that the mean vector
-    and covariance matrix fed to the simulation are EWMA estimates rather
-    than equally-weighted sample moments, so the simulation reflects recent
-    volatility regimes more strongly.
-
-    Parameters
-    ----------
-    portfolio_df : pd.DataFrame
-        Portfolio positions.
-    spot_prices : dict[str, float]
-        Current spot prices.
-    price_history_df : pd.DataFrame
-        Price history used to compute the EWMA calibration.
-    valuation_date : datetime
-        Pricing date for options.
-    confidence_level : float
-        VaR/ES confidence level, e.g. 0.95.
-    lam : float
-        EWMA decay factor λ ∈ (0, 1).  Default 0.94.
-    n_sims : int
-        Number of Monte Carlo paths.  Default 10 000.
-    random_seed : int
-        RNG seed for reproducibility.
-    """
+    """Calculate Monte Carlo VaR and ES by simulating return paths driven by an EWMA-calibrated mean and covariance matrix."""
     calibration_result = ewma_calibrate(price_history_df, lam=lam)
     result = monte_carlo_var_es(
         portfolio_df,

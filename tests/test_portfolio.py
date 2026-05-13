@@ -10,6 +10,7 @@ from src.portfolio import value_portfolio
 
 
 def test_portfolio_valuation_works():
+    """Verify that valuing a valid portfolio returns a float type."""
     df = load_portfolio("data/sample_portfolio.csv")
     spot_prices = {"AAPL": 210.0, "MSFT": 340.0}
     value = value_portfolio(df, spot_prices, datetime(2026, 5, 11))
@@ -17,6 +18,7 @@ def test_portfolio_valuation_works():
 
 
 def test_input_validation_catches_missing_option_fields(tmp_path):
+    """Ensure that loading a portfolio with missing required option fields raises a ValueError."""
     csv = tmp_path / "bad.csv"
     csv.write_text(
         "instrument_id,type,underlying,position,strike,maturity,option_type,implied_vol,risk_free_rate\n"
@@ -28,6 +30,7 @@ def test_input_validation_catches_missing_option_fields(tmp_path):
 
 
 def test_input_validation_catches_invalid_instrument_type(tmp_path):
+    """Ensure that loading a portfolio with an unsupported instrument type raises a ValueError."""
     csv = tmp_path / "bad_type.csv"
     # Insert a non-supported type "bond"
     csv.write_text(
@@ -45,8 +48,7 @@ def test_pnl_attribution_stock_plus_option_equals_total():
     portfolio P&L under a price shock.
 
     This confirms the portfolio valuation engine correctly aggregates
-    instrument-level changes with no unexplained residual — a fundamental
-    requirement for risk model integrity.
+    instrument-level changes with no unexplained residual.
     """
 
     valuation_date = datetime(2026, 5, 11)

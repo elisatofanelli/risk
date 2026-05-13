@@ -42,7 +42,7 @@ def load_portfolio(path: str) -> pd.DataFrame:
     valid_types = {"stock", "option"}
     invalid_types = sorted(set(df["type"]) - valid_types)
     if invalid_types:
-        raise ValueError(f"Invalid instrument type(s): {', '.join(invalid_types)}")
+        raise ValueError(f"Invalid instrument types: {', '.join(invalid_types)}")
 
     numeric_fields = ["position", "strike", "implied_vol", "risk_free_rate"]
     for field in numeric_fields:
@@ -72,7 +72,7 @@ def load_portfolio(path: str) -> pd.DataFrame:
         df.loc[option_mask, "maturity"] = pd.to_datetime(df.loc[option_mask, "maturity"], errors="coerce")
         if df.loc[option_mask, "maturity"].isna().any():
             rows = df.index[option_mask & df["maturity"].isna()].tolist()
-            raise ValueError(f"Invalid maturity date(s) for option row indices: {rows}")
+            raise ValueError(f"Invalid maturity dates for option row indices: {rows}")
 
     return df
 

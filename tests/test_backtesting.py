@@ -60,5 +60,3 @@ def test_backtesting_does_not_look_ahead(monkeypatch):
     assert max(seen_lengths) == 269
 
 
-
-    

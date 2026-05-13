@@ -8,6 +8,7 @@ from scipy.stats import norm
 
 
 def _validate_inputs(spot: float, strike: float, T: float, sigma: float, r: float) -> None:
+    """Validate standard Black-Scholes inputs to prevent domain errors."""
     if spot <= 0:
         raise ValueError("Spot price must be positive.")
     if strike <= 0:
@@ -19,6 +20,7 @@ def _validate_inputs(spot: float, strike: float, T: float, sigma: float, r: floa
 
 
 def _intrinsic_value(spot: float, strike: float, option_type: str) -> float:
+    """Calculate the intrinsic value of an option at expiration or zero-time-to-maturity."""
     if option_type == "call":
         return max(spot - strike, 0.0)
     if option_type == "put":
@@ -27,7 +29,7 @@ def _intrinsic_value(spot: float, strike: float, option_type: str) -> float:
 
 
 def black_scholes_price(spot: float, strike: float, T: float, sigma: float, r: float, option_type: str) -> float:
-    """Price a European option using the Black-Scholes formula."""
+    """Calculate the theoretical price of a European option using the Black-Scholes formula."""
 
     option_type = option_type.lower().strip()
     _validate_inputs(spot, strike, T, sigma, r)
@@ -50,7 +52,7 @@ def black_scholes_price(spot: float, strike: float, T: float, sigma: float, r: f
 
 
 def black_scholes_delta(spot: float, strike: float, T: float, sigma: float, r: float, option_type: str) -> float:
-    """Delta of a European option using the Black-Scholes formula."""
+    """Calculate the Delta of a European option."""
 
     option_type = option_type.lower().strip()
     _validate_inputs(spot, strike, T, sigma, r)
@@ -73,6 +75,7 @@ def black_scholes_delta(spot: float, strike: float, T: float, sigma: float, r: f
     raise ValueError("option_type must be 'call' or 'put'.")
 
 def black_scholes_gamma(spot: float, strike: float, T: float, sigma: float, r: float, option_type: str = "call") -> float:
+    """Calculate the Gamma of a European option."""
     option_type = option_type.lower().strip()
     _validate_inputs(spot, strike, T, sigma, r)
 
@@ -88,6 +91,7 @@ def black_scholes_gamma(spot: float, strike: float, T: float, sigma: float, r: f
 
 
 def implied_volatility(target_price: float, spot: float, strike: float, T: float, r: float, option_type: str, tol: float = 1e-6, max_iter: int = 100) -> float:
+    """Calculate the implied volatility of a European option for a given market price using bisection search."""
     option_type = option_type.lower().strip()
     
     intrinsic = _intrinsic_value(spot, strike, option_type)

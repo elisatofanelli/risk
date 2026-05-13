@@ -6,9 +6,8 @@ This document records the formal results of the automated test suite and the vis
 
 - **Test command:** `pytest -v`
 - **Status:** PASSING
-- **Last observed result:** `63 passed in 351.39s` (equally-weighted and EWMA suite, all six model variants, including new parameter stability and output stability tests).
-- **Plot tests:** All 10 visual tests in `notebooks/plot_tests.ipynb` pass with embedded assertions. Figures saved to `notebooks/plot_test_*.png`.
-- **Notes:** The suite utilises real historical market data (AAPL, MSFT, SPY) to ensure the mathematical defenses and statistical models are validated against empirical market structures rather than synthetic generators.
+- **Last observed result:** `62 passed in 357.78s` (equally-weighted and EWMA suite, all six model variants, including parameter stability and output stability tests).
+- **Plot tests:** All 10 visual tests in `notebooks/plot_tests.ipynb` pass with embedded assertions. 
 
 ## Results Table
 
@@ -19,39 +18,27 @@ The following table summarises the test execution mapped directly to the Test Pl
 | **Unit Tests** | Black-Scholes Positivity | Prices > 0 | Passed | Core pricing functions return valid positive floats. |
 | **Unit Tests** | Dynamic Volatility Shock | Volatility increases on price drop | Passed | The leverage effect heuristic correctly dynamically adjusts implied volatility. |
 | **Unit Tests** | Portfolio Valuation | Returns numeric total | Passed | Portfolio aggregation engine works correctly. |
-| **Unit Tests** | EWMA Weight Vector | Sums to 1; most recent > oldest | Passed | For all λ ∈ (0,1) tested, the normalised weight vector sums to 1.0 and the final weight strictly exceeds the first. |
-| **Unit Tests** | EWMA Covariance Symmetry | Symmetric, non-negative diagonal | Passed | EWMA covariance matrix is symmetric and all diagonal entries (variances) are non-negative. |
-| **Unit Tests** | EWMA Decay Param Validation | Raises `ValueError` for λ ≤ 0 or ≥ 1 | Passed | `ewma_calibrate` raises `ValueError` for boundary and out-of-range lambda values. |
-| **Unit Tests** | EWMA Schema Compatibility | Same keys as `calibrate_from_history` + EWMA keys | Passed | Returned dict contains all equally-weighted keys plus `ewma_lambda` and `ewma_weights`; downstream consumers are unaffected. |
 | **Special Cases** | Put-Call Parity | Parity mathematically holds | Passed | Pricing formula exhibits correct internal consistency and discounting. |
 | **Special Cases** | Time to Maturity (T=0) | Returns exact intrinsic value | Passed | System gracefully bypasses division-by-zero errors at expiration. |
 | **Special Cases** | Delta Boundaries | Call ∈ [0,1], Put ∈ [-1,0] | Passed | Option sensitivities respect theoretical limits. |
 | **Special Cases** | Volatility/Strike = 0 | Raises `ValueError` | Passed | System correctly rejects physically impossible states. |
-| **Special Cases** | EWMA Recency Sensitivity | EWMA VaR > EW VaR after volatility spike | Passed | After appending a high-volatility period to the end of history, all three EWMA VaR variants exceed their equally-weighted counterparts, confirming the recency weighting is active. |
 | **Data Testing** | Missing/Invalid Inputs | Raises `ValueError` | Passed | System rejects malformed CSVs and unsupported instrument types. |
 | **Data Testing** | Negative Historical Prices | Raises `ValueError` | Passed | Defense mechanism prevents fatal log-return math errors. |
-| **Integration** | End-to-End (3 models) | Models run & CSVs generated | Passed | Full equally-weighted workflow executes smoothly from input to report. |
-| **Integration** | End-to-End (6 models) | All 6 models run & written to CSV | Passed | All six model variants (equally-weighted and EWMA) execute and are written to a single risk report CSV without error. |
+| **Integration** | End-to-End (3 equally-weighted models) | Models run & CSVs generated | Passed | Full equally-weighted workflow executes smoothly from input to report. |
 | **Validation** | Covariance Dimensions | Matches asset count (N × N) | Passed | Calibration engine accurately maps multi-asset structures. |
 | **Validation** | P&L Attribution | Sum of parts = Total P&L | Passed | Confirms no unexplained residuals or leakages during portfolio aggregation. |
-| **Validation** | Gamma Convexity Benefit | Actual loss < Delta approx | Passed | Full repricing properly captures protective positive gamma during crashes. |
 | **Validation** | Vega Effect (Leverage) | Adjusted VaR ≤ Unadjusted | Passed | Dynamic volatility shock correctly buffers long option losses. |
-| **Validation** | EWMA vs. EW Ordering (calm regime) | EWMA VaR ≈ EW VaR | Passed | In a stationary, low-volatility synthetic return series, EWMA Historical VaR is within the specified tolerance of equally-weighted Historical VaR. |
 | **Robustness** | Extreme Market Outliers | System processes without NaNs | Passed | Model survives severe single-day historical crashes without failing. |
 | **Robustness** | Short Covariance Window | Matrix generates successfully | Passed | Calibration handles small historical samples gracefully. |
-| **Robustness** | Monte Carlo Convergence | Large N stabilizes variance | Passed | Simulation internally converges to the true non-linear portfolio distribution. |
+| **Robustness** | Monte Carlo Convergence | Larger N reduces error vs. baseline | Passed | Simulation internally converges; 2,000-sim error is smaller than 100-sim error relative to a 10,000-sim baseline. |
 | **Robustness** | Calibration Window Sensitivity | VaR changes dynamically | Passed | Model actively responds to varying historical observation window lengths. |
-| **Robustness** | EWMA Lambda Sensitivity | λ=0.80 vs. λ=0.97 produce different VaR | Passed | Running `ewma_historical_var_es` with λ=0.80 and λ=0.97 on identical data produces materially different VaR estimates; the decay parameter is a live, impactful input. |
 | **Stability** | Covariance Stability — Input Perturbation (EW) | Max covariance change < 1e-6 under 0.1% price shock | Passed | Equally-weighted covariance matrix is numerically stable; a uniform 0.1% price perturbation causes no material change in any matrix entry. |
-| **Stability** | Covariance Stability — Input Perturbation (EWMA) | Max covariance change < 1e-6 under 0.1% price shock | Passed | EWMA covariance matrix is at least as stable as the equally-weighted estimate under a uniform input shock, consistent with the down-weighting of old observations. |
+| **Stability** | Covariance Stability — Input Perturbation (EWMA) | Max covariance change < 1e-6 under 0.1% price shock | Passed | EWMA covariance matrix is at least as stable as the equally-weighted estimate under a uniform input shock. |
 | **Stability** | VaR Output Stability — Input Perturbation (all 6 models) | Relative VaR change < 2% under 0.1% spot shock | Passed | All six model variants produce VaR estimates that move by less than 2% when current spot prices are uniformly shifted by 0.1%, confirming the risk output is not chaotically sensitive to minor data revisions. |
-| **Stability** | Covariance Stability Over Rolling Windows (EW & EWMA) | Max swing < 5× median magnitude across 60-day windows (EW); < 10× (EWMA) | Passed | Covariance estimates calibrated on three consecutive non-overlapping 60-day windows do not fluctuate wildly under normal market conditions for either calibration family. |
-| **Stability** | VaR Output Stability Over Rolling Windows (Historical & EWMA Historical) | Period-to-period VaR jump < 100% | Passed | Historical VaR and EWMA Historical VaR estimates across three consecutive 60-day windows show no pathological instability (>100% jump), confirming a minimum sanity floor for output continuity over time. |
+| **Stability** | Covariance Stability Over Rolling Windows (EW & EWMA) | Max swing < 5× median magnitude (EW); < 10× (EWMA) | Passed | Covariance estimates calibrated on three consecutive non-overlapping 60-day windows do not fluctuate wildly under normal market conditions for either calibration family. |
+| **Stability** | VaR Output Stability Over Rolling Windows (Historical & EWMA Historical) | Period-to-period VaR jump < 100% | Passed | Historical VaR and EWMA Historical VaR estimates across three consecutive 60-day windows show no pathological instability, confirming a minimum sanity floor for output continuity over time. |
 | **Backtesting** | No Lookahead Bias | Only past data is accessed | Passed | Rolling window correctly segregates out-of-sample data. |
 | **Backtesting** | Exception Clustering | Identifies consecutive breaches | Passed | Statistical module accurately tracks sequential VaR failures. |
-| **Backtesting** | EWMA Backtest Schema | Correct columns and method label | Passed | Backtests with `ewma_historical`, `ewma_parametric`, and `ewma_monte_carlo` produce DataFrames with the same required columns as equally-weighted counterparts; `method` column is correctly labelled. |
-| **Backtesting** | EWMA Exception Clustering Improvement | EWMA pairs < EW pairs | Passed | Across the full 1,003-observation window, all three EWMA variants produce fewer consecutive exception pairs (5–6) than their equally-weighted counterparts (13–14), confirming faster adaptation to the 2022 regime shift. |
-| **Backtesting** | VaR Stability | Max daily jump < 10% | Passed | Model outputs remain stable day-to-day; properly mitigates the historical drop-off effect. |
 | **Plot Tests** | Call/Put prices vs. spot — monotonicity & convexity | Strict monotonicity; 2nd diff ≥ 0 | Passed | Call strictly increases, put strictly decreases with spot; both curves are convex. |
 | **Plot Tests** | Call price vs. strike — monotonicity | Strictly decreasing in K | Passed | 1st-difference derivative is uniformly negative across the strike grid. |
 | **Plot Tests** | Call price vs. implied vol — monotonicity | Strictly increasing in σ | Passed | Vega proxy (1st-difference wrt vol) is positive everywhere. |
@@ -67,18 +54,20 @@ The following table summarises the test execution mapped directly to the Test Pl
 
 ## Model Validation Analysis: VaR and ES Output Consistency
 
-During the automated integration run using real market data, the system produced the following risk metrics for the mixed portfolio (Current Value: **$4,505.33**):
+During the automated integration run using real market data, the system produced the following risk metrics for the mixed portfolio (Current Value: **$4,505.33**, Valuation Date: **2026-05-11**):
 
 | Model | VaR | ES |
 |---|---|---|
 | Historical | 672.51 | 989.99 |
 | Monte Carlo | 700.31 | 889.14 |
-| Parametric | 717.05 | 900.22 |
-| **EWMA Historical** | **485.15** | **536.94** |
-| **EWMA Parametric** | **572.21** | **718.76** |
-| **EWMA Monte Carlo** | **562.33** | **703.70** |
+| Parametric | 717.05 | — |
+| EWMA Historical | 485.15 | 536.94 |
+| EWMA Parametric | 572.21 | — |
+| EWMA Monte Carlo | 562.33 | 703.70 |
 | MC (User Params) | 776.22 | 983.82 |
-| Parametric (User Params) | 793.94 | 996.95 |
+| Parametric (User Params) | 793.94 | — |
+
+
 
 ### Interpretation of Equally-Weighted Results
 
@@ -145,7 +134,7 @@ The primary remediation for the equally-weighted Historical VaR failure is to re
 
 ## Stability Test Results
 
-Six new stability tests were added to `tests/test_risk_models.py` following the expanded test plan. These tests apply both input-perturbation and rolling-window stability checks across both calibration families.
+Six stability tests are included in `tests/test_risk_models.py`, applying both input-perturbation and rolling-window stability checks across both calibration families.
 
 **Input Perturbation — Covariance (EW and EWMA):** A uniform 0.1% multiplicative shock applied to all historical prices produces a maximum absolute change of less than 1e-6 in any covariance entry for both the equally-weighted and EWMA calibrators. This confirms numerical stability of the calibration layer and the absence of chaotic sensitivity to minor data revisions.
 
