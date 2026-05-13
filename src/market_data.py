@@ -6,7 +6,7 @@ import pandas as pd
 
 
 def load_price_history(path: str) -> pd.DataFrame:
-    """Load historical prices, validate them, and return a date-indexed DataFrame."""
+    """Load historical prices, validate them and return a date-indexed DataFrame."""
 
     df = pd.read_csv(path)
     if "date" not in df.columns:

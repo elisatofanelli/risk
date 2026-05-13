@@ -4,6 +4,7 @@ from src.backtesting import backtest_var, summarize_backtest
 from src.input_loader import load_portfolio
 from src.market_data import load_price_history
 from src.reporting import save_backtest_summary
+import numpy as np
 
 
 def test_backtest_output_has_required_columns():
@@ -58,3 +59,6 @@ def test_backtesting_does_not_look_ahead(monkeypatch):
     assert min(seen_lengths) == 251
     assert max(seen_lengths) == 269
 
+
+
+    

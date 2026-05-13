@@ -51,7 +51,6 @@ def test_pnl_attribution_stock_plus_option_equals_total():
 
     valuation_date = datetime(2026, 5, 11)
 
-    # Build a minimal mixed portfolio: 10 shares of AAPL + 1 ATM call on AAPL
     portfolio_df = pd.DataFrame([
         {
             "instrument_id": "STK1",
@@ -80,12 +79,10 @@ def test_pnl_attribution_stock_plus_option_equals_total():
     spot_before = {"AAPL": 200.0}
     spot_after  = {"AAPL": 195.0}  # -2.5% shock
 
-    # Total portfolio P&L
     value_before = value_portfolio(portfolio_df, spot_before, valuation_date)
     value_after  = value_portfolio(portfolio_df, spot_after,  valuation_date)
     total_pnl    = value_after - value_before
 
-    # Instrument-level P&L
     stock_row  = portfolio_df[portfolio_df["type"] == "stock"].iloc[0]
     option_row = portfolio_df[portfolio_df["type"] == "option"].iloc[0]
 
@@ -102,7 +99,6 @@ def test_pnl_attribution_stock_plus_option_equals_total():
         "Unexplained residual detected."
     )
 
-    # Direction checks: stock loses on a down move, call also loses
     assert stock_pnl < 0, "Stock should lose value when spot drops"
     assert option_pnl < 0, "Call option should lose value when spot drops"
 

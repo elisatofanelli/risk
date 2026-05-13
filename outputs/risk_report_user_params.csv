@@ -1,0 +1,3 @@
+method,VaR,ES,confidence_level,current_value,number_of_scenarios
+mc_user_params,776.2176731584623,983.8211152665433,0.95,4505.33049095487,10000.0
+param_user_params,793.9409301055455,,0.95,4505.33049095487,

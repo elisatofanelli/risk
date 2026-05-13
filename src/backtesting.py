@@ -10,7 +10,8 @@ from scipy.stats import chi2
 
 from .calibration import calibrate_from_history
 from .portfolio import value_portfolio
-from .risk_models import historical_var_es, monte_carlo_var_es, parametric_var
+from .risk_models import historical_var_es, monte_carlo_var_es, parametric_var, \
+    ewma_historical_var_es, ewma_parametric_var, ewma_monte_carlo_var_es
 
 
 def _method_var(
@@ -31,15 +32,26 @@ def _method_var(
         return parametric_var(portfolio_df, current_prices, calibration_result, valuation_date, confidence_level=confidence_level)
     if method == "monte_carlo":
         return monte_carlo_var_es(
-            portfolio_df,
-            current_prices,
-            calibration_result,
-            valuation_date,
-            confidence_level=confidence_level,
-            n_sims=n_sims,
-            random_seed=random_seed,
+            portfolio_df, current_prices, calibration_result, valuation_date,
+            confidence_level=confidence_level, n_sims=n_sims, random_seed=random_seed,
         )
-    raise ValueError("method must be one of: historical, parametric, monte_carlo")
+    if method == "ewma_historical":
+        return ewma_historical_var_es(
+            portfolio_df, history_window, valuation_date,
+            confidence_level=confidence_level,
+        )
+    if method == "ewma_parametric":
+        return ewma_parametric_var(
+            portfolio_df, current_prices, history_window, valuation_date,
+            confidence_level=confidence_level,
+        )
+    if method == "ewma_monte_carlo":
+        return ewma_monte_carlo_var_es(
+            portfolio_df, current_prices, history_window, valuation_date,
+            confidence_level=confidence_level, n_sims=n_sims, random_seed=random_seed,
+        )
+    raise ValueError("method must be one of: historical, parametric, monte_carlo, "
+                     "ewma_historical, ewma_parametric, ewma_monte_carlo")
 
 
 def backtest_var(
@@ -53,8 +65,10 @@ def backtest_var(
 ) -> pd.DataFrame:
     """Run rolling one-day-ahead VaR backtesting."""
 
-    if method not in {"historical", "parametric", "monte_carlo"}:
-        raise ValueError("method must be one of: historical, parametric, monte_carlo")
+    _valid_methods = {"historical", "parametric", "monte_carlo",
+                      "ewma_historical", "ewma_parametric", "ewma_monte_carlo"}
+    if method not in _valid_methods:
+        raise ValueError(f"method must be one of: {', '.join(sorted(_valid_methods))}")
 
     if len(price_history_df) <= calibration_window:
         raise ValueError("Not enough observations for the requested calibration window.")

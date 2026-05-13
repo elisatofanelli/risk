@@ -72,3 +72,42 @@ def black_scholes_delta(spot: float, strike: float, T: float, sigma: float, r: f
         return norm.cdf(d1) - 1.0
     raise ValueError("option_type must be 'call' or 'put'.")
 
+def black_scholes_gamma(spot: float, strike: float, T: float, sigma: float, r: float, option_type: str = "call") -> float:
+    option_type = option_type.lower().strip()
+    _validate_inputs(spot, strike, T, sigma, r)
+
+    if T <= 0:
+        return 0.0
+
+    if sigma <= 0:
+        raise ValueError("Volatility must be positive when time to maturity is greater than zero.")
+
+    d1 = (log(spot / strike) + (r + 0.5 * sigma ** 2) * T) / (sigma * sqrt(T))
+    
+    return norm.pdf(d1) / (spot * sigma * sqrt(T))
+
+
+def implied_volatility(target_price: float, spot: float, strike: float, T: float, r: float, option_type: str, tol: float = 1e-6, max_iter: int = 100) -> float:
+    option_type = option_type.lower().strip()
+    
+    intrinsic = _intrinsic_value(spot, strike, option_type)
+    if target_price < intrinsic:
+        raise ValueError("Target price is below intrinsic value; implied volatility is undefined.")
+        
+    low_vol = 1e-5
+    high_vol = 5.0
+    
+    for i in range(max_iter):
+        mid_vol = (low_vol + high_vol) / 2.0
+        price = black_scholes_price(spot, strike, T, mid_vol, r, option_type)
+        
+        diff = price - target_price
+        if abs(diff) < tol:
+            return mid_vol
+            
+        if price < target_price:
+            low_vol = mid_vol
+        else:
+            high_vol = mid_vol
+            
+    return (low_vol + high_vol) / 2.0

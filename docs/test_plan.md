@@ -11,9 +11,10 @@ This test plan covers:
 - Data quality and CSV input validation
 - Black-Scholes pricing and delta behaviors
 - Portfolio valuation and aggregation
-- Historical calibration
-- Historical, Monte Carlo, and parametric VaR
-- Rolling VaR backtesting and clustering analysis
+- Historical calibration (equally-weighted and EWMA)
+- Historical, Monte Carlo, and Parametric VaR — equally-weighted and EWMA variants
+- Rolling VaR backtesting across all six models and clustering analysis
+- Visual / plotting tests for pricing behaviour and EWMA weights
 - Report generation
 
 ## Unit Tests
@@ -22,6 +23,10 @@ This test plan covers:
 - Option prices maintain strict monotonicity with respect to spot price and implied volatility. [`tests/test_pricing.py`]
 - Portfolio valuation computes correct aggregated values and returns a numeric float result. [`tests/test_portfolio.py`]
 - Dynamic volatility helper correctly increases implied volatility when spot prices experience a negative shock (leverage effect). [`tests/test_risk_models.py`]
+- **EWMA weight vector:** For any λ ∈ (0, 1) and T observations, the normalised EWMA weight vector produced by `ewma_calibrate` sums to 1.0 and the final element (most recent day) is strictly greater than the first element (oldest day). [`tests/test_risk_models.py`]
+- **EWMA covariance symmetry:** The EWMA covariance matrix returned by `ewma_calibrate` is symmetric and has non-negative diagonal entries (non-negative variances). [`tests/test_risk_models.py`]
+- **EWMA decay parameter validation:** `ewma_calibrate` raises a `ValueError` when called with λ ≤ 0 or λ ≥ 1. [`tests/test_risk_models.py`]
+- **EWMA vs. equal-weight schema compatibility:** The dict returned by `ewma_calibrate` contains the same keys as `calibrate_from_history` plus `ewma_lambda` and `ewma_weights`, confirming it is a drop-in substitute for all downstream consumers. [`tests/test_risk_models.py`]
 
 ## Special Cases and Behavioral Tests
 
@@ -29,6 +34,7 @@ This test plan covers:
 - **Delta Boundaries:** Option delta is bounded correctly ([0, 1] for calls, [-1, 0] for puts). [`tests/test_pricing.py`]
 - **Time to Maturity Zero:** Confirms the pricing engine correctly defaults to intrinsic value (avoiding division by zero) when options expire. [`tests/test_pricing.py`]
 - **Zero Volatility / Zero Strike:** Ensures the system mathematically rejects impossible physical states (volatility or strike = 0) to prevent silent computational failures. [`tests/test_pricing.py`]
+- **EWMA recency sensitivity:** When a period of high-volatility returns is placed at the end of the price history, the EWMA VaR (all three variants) must be strictly greater than the corresponding equally-weighted VaR computed on the same window. This confirms the recency weighting is active and directionally correct. [`tests/test_risk_models.py`]
 
 ## Data Testing and Input Validation
 
@@ -39,37 +45,62 @@ This test plan covers:
 ## Integration Tests
 
 - Load an arbitrary sample portfolio and sample historical prices together. [`tests/test_risk_models.py`]
-- Calibrate statistical parameters (mean, covariance) from history and successfully run all three risk models. [`tests/test_risk_models.py`]
+- Calibrate statistical parameters (mean, covariance) from history and successfully run all three equally-weighted risk models. [`tests/test_risk_models.py`]
+- Calibrate EWMA parameters from the same history and successfully run all three EWMA risk models; confirm all six results are written to a single risk report CSV. [`tests/test_risk_models.py`]
 - Write the final computed risk metrics smoothly to the `outputs/` directory. [`tests/test_risk_models.py`]
 
 ## Model Validation Tests
 
-- **Covariance Dimensions:** Covariance matrix dimensions precisely match the number of assets in the underlying price history. [`tests/test_risk_models.py`]
+- **Covariance Dimensions:** Covariance matrix dimensions precisely match the number of assets in the underlying price history (both equally-weighted and EWMA). [`tests/test_risk_models.py`]
 - **Historical Scenario Repricing:** Accurately uses current spot prices combined with historical log-return shocks. [`tests/test_risk_models.py`]
-- **Monte Carlo Reproducibility:** Simulation paths are fully reproducible across multiple runs by utilizing a fixed random seed. [`tests/test_risk_models.py`]
-- **Loss Positivity:** VaR and Expected Shortfall outputs strictly produce non-negative loss values. [`tests/test_risk_models.py`]
+- **Monte Carlo Reproducibility:** Simulation paths are fully reproducible across multiple runs by utilizing a fixed random seed (applies to both equally-weighted and EWMA Monte Carlo). [`tests/test_risk_models.py`]
+- **Loss Positivity:** VaR and Expected Shortfall outputs strictly produce non-negative loss values across all six model variants. [`tests/test_risk_models.py`]
 - **P&L Attribution:** Confirms that the aggregate portfolio P&L equals the exact sum of individual stock and option P&L components under a price shock, ensuring no leakages in aggregation. [`tests/test_portfolio.py`]
 - **Gamma Convexity Benefit:** Verifies that full Black-Scholes repricing correctly captures positive gamma for long options during severe market shocks, resulting in smaller actual losses than a linear delta approximation would predict. [`tests/test_pricing.py`]
 - **Vega Effect (Volatility Buffering):** Confirms that the dynamic leverage effect (rising volatility during market drops) correctly increases the value of long option positions, acting as a buffer that reduces overall portfolio VaR compared to an unadjusted model. [`tests/test_risk_models.py`]
+- **EWMA vs. equal-weight ordering (low-volatility regime):** In a calm, stationary return environment, EWMA Historical VaR must be numerically close to (within a reasonable tolerance of) equally-weighted Historical VaR, since recency weighting should not introduce large distortions when all periods have similar volatility. [`tests/test_risk_models.py`]
 
 ## Robustness Tests
 
 - **Extreme Scenarios:** Evaluate model behavior when subjected to exceptionally large historical outliers (e.g., extreme single-day market crashes) to ensure the system does not fail on NaN standard deviations. [`tests/test_risk_models.py`]
-- **Covariance Stability:** Confirm the calibration engine gracefully handles short historical windows without crashing when generating matrices. [`tests/test_risk_models.py`]
-- **Monte Carlo Convergence:** Verify that Monte Carlo VaR estimates approach the analytical Parametric VaR as `n_sims` increases from 200 to 10,000, confirming the mathematical consistency of the simulation engine. [`tests/test_risk_models.py`]
-- **Calibration Window Sensitivity:** Evaluates how the VaR estimate responds to different historical calibration window sizes (e.g., 250 days vs 60 days), ensuring the model dynamically adapts to recent market volatility rather than remaining static. [`tests/test_risk_models.py`]
+- **Covariance Stability:** Confirm the calibration engine gracefully handles short historical windows without crashing when generating matrices, for both `calibrate_from_history` and `ewma_calibrate`. [`tests/test_risk_models.py`]
+- **Monte Carlo Convergence:** Verify that Monte Carlo VaR estimates approach the analytical Parametric VaR as `n_sims` increases from 200 to 10,000, confirming the mathematical consistency of the simulation engine. The same convergence property is verified for the EWMA Monte Carlo against EWMA Parametric. [`tests/test_risk_models.py`]
+- **Calibration Window Sensitivity:** Evaluates how the VaR estimate responds to different historical calibration window sizes (e.g., 250 days vs 60 days), ensuring the model dynamically adapts to recent market volatility rather than remaining static. Applied to both equally-weighted and EWMA Historical methods. [`tests/test_risk_models.py`]
+- **EWMA lambda sensitivity:** Running `ewma_historical_var_es` with λ = 0.80 vs. λ = 0.97 on the same data must produce different VaR estimates, confirming the decay parameter is a live, impactful setting and not a cosmetic one. [`tests/test_risk_models.py`]
 
 ## Backtesting Tests
 
-- Rolling backtest effectively generates the required schema and columns for daily evaluation. [`tests/test_backtesting.py`]
+- Rolling backtest effectively generates the required schema and columns for daily evaluation across all six model methods. [`tests/test_backtesting.py`]
 - Exception flags strictly return boolean structures. [`tests/test_backtesting.py`]
 - Actual exception rate is bounded reasonably between 0 and 1. [`tests/test_backtesting.py`]
 - No lookahead bias is introduced; the engine is strictly prohibited from accessing data beyond the rolling calibration window. [`tests/test_backtesting.py`]
 - The summary function effectively captures unconditional coverage metrics and executes a clustering analysis to detect consecutive daily exceptions. [`tests/test_backtesting.py`]
 - Summary output is automatically created and persisted to disk. [`tests/test_backtesting.py`]
+- **EWMA backtest schema:** Backtests run with `method="ewma_historical"`, `"ewma_parametric"`, and `"ewma_monte_carlo"` produce DataFrames with the same required columns as their equally-weighted counterparts, and the `method` column correctly labels each row. [`tests/test_backtesting.py`]
+- **EWMA exception rate improvement:** Over the full 1,003-observation backtest window, the EWMA variants are expected to produce fewer clustered exceptions than the equally-weighted variants, reflecting faster adaptation to the 2022 volatility regime shift. This is verified by comparing `consecutive_exception_pairs` in the backtest summary. [`tests/test_backtesting.py`]
+
+## Plot Tests
+
+Visual tests are implemented in `notebooks/plot_tests.ipynb`. They confirm that model implications hold graphically — as recommended in the model validation lecture — and provide a second, independent check on behaviours that automated assertion tests may miss (e.g. subtle pricing noise visible only in second-order discrete derivatives).
+
+Each plot test generates a saved figure and includes an embedded programmatic assertion so the notebook can be run end-to-end and any failure is caught immediately.
+
+- **Call/Put prices vs. spot — monotonicity and convexity:** Plots prices, 1st-difference derivatives (≈ delta), and 2nd-difference derivatives (≈ gamma) along a fine spot grid. Confirms call increases and put decreases with spot, and both curves are convex. [`notebooks/plot_tests.ipynb`, Test 1]
+- **Call price vs. strike — monotonicity:** Plots call price and its 1st-difference derivative as a function of strike. Confirms call price is strictly decreasing in strike (higher hurdle → lower value). [`notebooks/plot_tests.ipynb`, Test 2]
+- **Call price vs. implied volatility — monotonicity:** Plots call price and vega proxy across the vol range. Confirms call price is strictly increasing in implied volatility. [`notebooks/plot_tests.ipynb`, Test 3]
+- **1st-difference derivative vs. analytic delta:** Central finite-difference `(C(S+h) − C(S−h)) / 2h` is overlaid on `black_scholes_delta` for both calls and puts. Maximum absolute error must be below 1e-4. Pricing noise would appear as erratic divergence from the analytic curve. [`notebooks/plot_tests.ipynb`, Test 4]
+- **2nd-difference derivative vs. analytic gamma:** Finite-difference `(C(S+h) − 2C(S) + C(S−h)) / h²` is overlaid on `black_scholes_gamma`. Maximum absolute error must be below 1e-3; gamma must be non-negative everywhere. Spikes in the residual indicate pricing noise. [`notebooks/plot_tests.ipynb`, Test 5]
+- **Option price decay over time (theta, no spikes):** ATM call and put prices are plotted against a dense time-to-maturity grid from near-zero to 2 years. The 1st- and 2nd-difference derivatives over time are plotted to detect any discontinuities. Price must be monotonically increasing with T and must converge to intrinsic value at expiry. [`notebooks/plot_tests.ipynb`, Test 6]
+- **Pricing noise check on fine spot grid:** Prices, 1st-differences, and 2nd-differences are plotted for n=1,000 spot points. The maximum relative 2nd-difference must remain below 1e-3, confirming the formula is smooth enough not to introduce noise into VaR scenario repricing. [`notebooks/plot_tests.ipynb`, Test 7]
+- **Put-Call Parity across strikes (residual ~0):** The empirical C − P is overlaid on the theoretical S − K·e^{−rT} curve, and the residual is plotted separately. Maximum absolute residual must be below 1e-8 — machine-precision confirmation of arbitrage-free pricing. [`notebooks/plot_tests.ipynb`, Test 8]
+- **Forward rates consistency across tenors:** Call price curves for tenors of 0.25Y, 0.5Y, 1Y, 1.5Y, and 2Y are plotted on the same axes. ATM call prices are extracted and plotted as a bar chart to confirm strict monotone increase with tenor. [`notebooks/plot_tests.ipynb`, Test 9]
+- **EWMA weight decay visualisation:** EWMA weight vectors for λ ∈ {0.80, 0.94, 0.97, 0.99} are plotted on linear and log scales. Confirms weights sum to 1, most recent observation carries the highest weight, and smaller λ produces faster decay. [`notebooks/plot_tests.ipynb`, Test 10]
 
 ## Known Limitations
 
-- Parametric VaR relies strictly on a first-order delta-normal approximation, ignoring gamma, vega, and higher-order convex option risks.
+- Parametric VaR (both equally-weighted and EWMA) relies strictly on a first-order delta-normal approximation, ignoring gamma, vega, and higher-order convex option risks.
 - The simple backtest pass/fail rule serves as a quick diagnostic tolerance check, not a fully comprehensive regulatory validation.
 - Kupiec unconditional coverage is evaluated, but more complex independence testing (like Christoffersen's) is not implemented for the scope of this engine.
+- The EWMA decay factor λ = 0.94 is fixed as the default; in a production system it would be calibrated per asset class or estimated jointly with the covariance model.
+- The EWMA Monte Carlo backtest uses a fixed random seed per rolling window for reproducibility, which limits observation of simulation variance across time.
+- Plot tests require a Jupyter environment with `matplotlib` and `numpy`; they are not collected by `pytest` and must be run manually via `jupyter nbconvert --to notebook --execute notebooks/plot_tests.ipynb`.
